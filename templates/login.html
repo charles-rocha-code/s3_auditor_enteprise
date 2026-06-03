@@ -100,6 +100,20 @@
         }
         .debug-info div { margin: 4px 0; }
         .password-hint { font-size: 12px; color: #6b7280; margin-top: 4px; }
+        .forgot-password {
+            text-align: right;
+            margin-top: -8px;
+            margin-bottom: 16px;
+        }
+        .forgot-password a {
+            color: #8b92a7;
+            text-decoration: none;
+            font-size: 13px;
+        }
+        .forgot-password a:hover {
+            color: #5b7cff;
+            text-decoration: underline;
+        }
     </style>
 </head>
 <body>
@@ -130,6 +144,10 @@
             <div class="mfa-info">
                 Digite o código de 6 dígitos do Google Authenticator
             </div>
+        </div>
+
+        <div class="forgot-password">
+            <a href="/forgot-password">Esqueceu a senha?</a>
         </div>
 
         <button type="submit" class="btn" id="login-btn">Entrar</button>

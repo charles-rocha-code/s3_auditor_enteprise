@@ -1,0 +1,1402 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Security Multicloud Storage Dashboard Enterprise</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0"></script>
+  <style>
+    :root {
+      --bg: #07111f;
+      --panel: rgba(12, 20, 35, 0.92);
+      --panel-2: rgba(16, 27, 46, 0.92);
+      --muted: #8ea4c7;
+      --text: #e8eefb;
+      --border: rgba(148, 163, 184, 0.16);
+      --blue: #3b82f6;
+      --cyan: #22d3ee;
+      --green: #22c55e;
+      --amber: #f59e0b;
+      --red: #ef4444;
+      --purple: #8b5cf6;
+      --shadow: 0 20px 50px rgba(0,0,0,.35);
+      --radius: 22px;
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; background:
+      radial-gradient(circle at top left, rgba(59,130,246,.16), transparent 22%),
+      radial-gradient(circle at top right, rgba(34,211,238,.11), transparent 18%),
+      linear-gradient(180deg, #08111e 0%, #050b14 100%);
+      color: var(--text); font-family: Inter, Segoe UI, Roboto, Arial, sans-serif; }
+    body { min-height: 100vh; }
+    a { color: #8bdcff; text-decoration: none; }
+    button, input, select, textarea { font: inherit; }
+    .shell { display: grid; grid-template-columns: 320px 1fr; min-height: 100vh; }
+    .sidebar {
+      border-right: 1px solid var(--border);
+      background: linear-gradient(180deg, rgba(7, 13, 24, 0.95), rgba(8, 13, 24, 0.86));
+      backdrop-filter: blur(12px);
+      padding: 24px 18px;
+      position: sticky; top: 0; height: 100vh; overflow: auto;
+    }
+    .brand { display: flex; gap: 14px; align-items: flex-start; margin-bottom: 24px; }
+    .brand-icon {
+      width: 44px; height: 44px; border-radius: 14px; display: grid; place-items: center;
+      background: linear-gradient(135deg, rgba(59,130,246,.28), rgba(34,211,238,.18));
+      border: 1px solid rgba(96,165,250,.35); box-shadow: 0 0 30px rgba(59,130,246,.18);
+      font-size: 24px;
+    }
+    .brand h1 { margin: 0; font-size: 20px; line-height: 1.1; }
+    .brand p { margin: 6px 0 0; color: var(--muted); font-size: 12px; line-height: 1.4; }
+    .sidebar-section { margin-top: 22px; }
+    .section-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
+    .section-head h2 { margin: 0; font-size: 14px; text-transform: uppercase; letter-spacing: .08em; color: #c6d4ef; }
+    .ghost-btn, .danger-ghost {
+      border: 1px solid var(--border); background: rgba(15,23,42,.7); color: #d4def2;
+      border-radius: 12px; padding: 8px 12px; cursor: pointer; transition: .18s ease;
+      font-size: 12px; font-weight: 600;
+    }
+    .ghost-btn:hover { transform: translateY(-1px); border-color: rgba(96,165,250,.45); }
+    .danger-ghost { background: rgba(127,29,29,.25); color: #fecaca; border-color: rgba(239,68,68,.25); }
+    .danger-ghost:hover { border-color: rgba(239,68,68,.48); }
+    .history-list, .recommendation-list { display: flex; flex-direction: column; gap: 10px; }
+    .history-item, .recommendation-item {
+      background: linear-gradient(180deg, rgba(15,23,42,.82), rgba(9,15,26,.82));
+      border: 1px solid var(--border); border-radius: 18px; padding: 14px; box-shadow: var(--shadow);
+    }
+    .history-item { cursor: pointer; transition: .18s ease; }
+    .history-item:hover { transform: translateX(4px); border-color: rgba(96,165,250,.38); }
+    .history-item.selected { border-color: rgba(245,158,11,.55); box-shadow: 0 0 0 1px rgba(245,158,11,.28); }
+    .history-top { display: flex; justify-content: space-between; gap: 10px; align-items: start; }
+    .history-name { font-size: 14px; font-weight: 700; color: #f7fbff; word-break: break-word; }
+    .history-meta { margin-top: 6px; color: var(--muted); font-size: 11px; line-height: 1.45; }
+    .rec-priority { font-size: 11px; color: #ffd2d2; font-weight: 800; margin-bottom: 6px; display: block; }
+    .rec-text { color: #dce7fb; font-size: 13px; line-height: 1.45; }
+    .main {
+      padding: 24px 26px 40px;
+      overflow: auto;
+    }
+    .topbar {
+      display: flex; justify-content: space-between; align-items: center; gap: 18px; margin-bottom: 20px;
+      position: sticky; top: 0; z-index: 20; backdrop-filter: blur(12px);
+      padding: 12px 0 10px; background: linear-gradient(180deg, rgba(7,17,31,.92), rgba(7,17,31,.70), rgba(7,17,31,0));
+    }
+    .meta-row { display: flex; gap: 10px; flex-wrap: wrap; }
+    .pill {
+      display: inline-flex; align-items: center; gap: 8px; border-radius: 999px; padding: 10px 16px;
+      border: 1px solid var(--border); background: rgba(10,18,31,.76); color: #dfe9fb; box-shadow: var(--shadow);
+      min-height: 46px;
+    }
+    .pill strong { color: white; }
+    .provider-pill { font-weight: 800; }
+    .provider-AWS_S3 { background: linear-gradient(135deg, rgba(245,158,11,.24), rgba(245,158,11,.1)); border-color: rgba(245,158,11,.38); }
+    .provider-GCS, .provider-GCP { background: linear-gradient(135deg, rgba(34,197,94,.24), rgba(34,197,94,.1)); border-color: rgba(34,197,94,.38); }
+    .provider-AZURE, .provider-AZURE_BLOB, .provider-AZURE_STORAGE { background: linear-gradient(135deg, rgba(59,130,246,.24), rgba(59,130,246,.1)); border-color: rgba(59,130,246,.38); }
+    .risk-pill.critical { background: linear-gradient(135deg, rgba(239,68,68,.22), rgba(239,68,68,.09)); border-color: rgba(239,68,68,.4); }
+    .risk-pill.high { background: linear-gradient(135deg, rgba(245,158,11,.24), rgba(245,158,11,.09)); border-color: rgba(245,158,11,.36); }
+    .risk-pill.medium { background: linear-gradient(135deg, rgba(59,130,246,.22), rgba(59,130,246,.09)); border-color: rgba(59,130,246,.36); }
+    .risk-pill.low { background: linear-gradient(135deg, rgba(34,197,94,.22), rgba(34,197,94,.09)); border-color: rgba(34,197,94,.36); }
+    .user-actions { display: flex; gap: 10px; align-items: center; }
+    .logout-btn {
+      border: 0; border-radius: 14px; padding: 11px 16px; background: linear-gradient(135deg, #dc2626, #b91c1c);
+      color: white; font-weight: 700; cursor: pointer; box-shadow: 0 12px 24px rgba(185,28,28,.26);
+    }
+    .hero {
+      background: linear-gradient(135deg, rgba(16,27,46,.95), rgba(10,16,29,.94));
+      border: 1px solid var(--border); border-radius: 28px; padding: 22px; box-shadow: var(--shadow);
+      margin-bottom: 18px;
+    }
+    .hero-top { display: grid; grid-template-columns: 1.4fr .8fr; gap: 18px; align-items: center; }
+    .hero-title { font-size: 32px; margin: 0 0 8px; line-height: 1.05; }
+    .hero-sub { color: var(--muted); font-size: 15px; line-height: 1.5; max-width: 760px; }
+    .hero-insight {
+      background: linear-gradient(135deg, rgba(15,23,42,.8), rgba(8,14,24,.9)); border: 1px solid var(--border);
+      border-radius: 22px; padding: 18px; min-height: 150px;
+    }
+    .hero-insight h3 { margin: 0 0 8px; font-size: 16px; }
+    .hero-insight p { margin: 0; color: var(--muted); line-height: 1.5; font-size: 14px; }
+    .scan-panel {
+      margin-top: 18px; background: rgba(8,14,24,.65); border: 1px solid var(--border);
+      border-radius: 22px; padding: 16px;
+    }
+    .mode-toggle { display: inline-flex; gap: 8px; background: rgba(2,8,20,.6); padding: 5px; border-radius: 14px; border: 1px solid var(--border); }
+    .mode-btn {
+      border: 0; border-radius: 10px; padding: 10px 16px; cursor: pointer; font-weight: 700;
+      background: transparent; color: var(--muted); transition: .18s ease;
+    }
+    .mode-btn.active { background: linear-gradient(135deg, rgba(59,130,246,.25), rgba(59,130,246,.12)); color: white; box-shadow: inset 0 0 0 1px rgba(96,165,250,.35); }
+    .scan-grid { display: grid; grid-template-columns: 1fr auto; gap: 12px; margin-top: 12px; }
+    .input, .select, .textarea {
+      width: 100%; background: rgba(15,23,42,.76); color: #ecf4ff; border: 1px solid rgba(148,163,184,.18);
+      border-radius: 16px; padding: 14px 16px; transition: .18s ease;
+    }
+    .textarea { min-height: 120px; resize: vertical; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+    .input:focus, .select:focus, .textarea:focus { outline: none; border-color: rgba(96,165,250,.42); box-shadow: 0 0 0 4px rgba(59,130,246,.10); }
+    .primary-btn {
+      border: 0; border-radius: 16px; padding: 14px 20px; background: linear-gradient(135deg, #3b82f6, #2563eb);
+      color: white; font-weight: 800; cursor: pointer; box-shadow: 0 16px 28px rgba(37,99,235,.26);
+      min-width: 150px;
+    }
+    .credentials-box {
+      display: none; margin-top: 12px; padding: 14px; border-radius: 20px; border: 1px solid var(--border);
+      background: linear-gradient(180deg, rgba(10,16,29,.85), rgba(13,20,35,.85));
+    }
+    .credentials-box.active { display: block; }
+    .warning {
+      background: rgba(245,158,11,.12); border: 1px solid rgba(245,158,11,.24); color: #ffe2a8;
+      border-radius: 14px; padding: 12px 14px; margin-bottom: 12px; font-size: 13px;
+    }
+    .credentials-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+    .full { grid-column: 1 / -1; }
+    .input-group label { display: block; margin: 0 0 6px; font-size: 12px; color: #c8d7f3; font-weight: 700; }
+    .input-group small { display: block; margin-top: 6px; color: var(--muted); font-size: 11px; }
+    .results { display: none; }
+    .results.active { display: block; }
+    .kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; margin: 18px 0; }
+    .kpi {
+      background: linear-gradient(180deg, rgba(15,23,42,.88), rgba(11,17,29,.88)); border: 1px solid var(--border);
+      border-radius: 22px; padding: 18px; box-shadow: var(--shadow);
+    }
+    .kpi-label { color: var(--muted); text-transform: uppercase; letter-spacing: .08em; font-size: 12px; margin-bottom: 10px; }
+    .kpi-value { font-size: 30px; font-weight: 800; line-height: 1; }
+    .kpi-sub { margin-top: 6px; color: var(--muted); font-size: 13px; }
+    .content-grid { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, .8fr); gap: 18px; }
+    .panel {
+      background: linear-gradient(180deg, rgba(13,20,35,.92), rgba(8,14,24,.92)); border: 1px solid var(--border);
+      border-radius: 24px; padding: 18px; box-shadow: var(--shadow);
+    }
+    .panel-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; margin-bottom: 14px; }
+    .panel-title { margin: 0; font-size: 18px; }
+    .panel-subtitle { margin: 5px 0 0; color: var(--muted); font-size: 13px; }
+    .filter-bar { display: flex; flex-wrap: wrap; gap: 10px; padding: 12px; border-radius: 18px; background: rgba(3,9,17,.55); border: 1px solid var(--border); margin-bottom: 14px; }
+    .sev-btn {
+      border: 1px solid transparent; border-radius: 999px; padding: 8px 12px; cursor: pointer; color: white; font-weight: 700; opacity: .5;
+      transition: .18s ease;
+    }
+    .sev-btn.active { opacity: 1; transform: translateY(-1px); box-shadow: 0 0 0 1px rgba(255,255,255,.14), 0 10px 22px rgba(0,0,0,.18); }
+    .sev-btn.critical { background: rgba(239,68,68,.18); color: #ffc5c5; border-color: rgba(239,68,68,.25); }
+    .sev-btn.high { background: rgba(245,158,11,.18); color: #ffe0a1; border-color: rgba(245,158,11,.25); }
+    .sev-btn.medium { background: rgba(59,130,246,.18); color: #c9ddff; border-color: rgba(59,130,246,.25); }
+    .sev-btn.low { background: rgba(34,197,94,.18); color: #c3ffd7; border-color: rgba(34,197,94,.25); }
+    .filter-spacer { flex: 1; }
+    .bulk-head { display: flex; gap: 10px; align-items: center; }
+    .table-wrap { overflow: auto; border-radius: 18px; border: 1px solid var(--border); }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { padding: 14px 12px; text-align: left; border-bottom: 1px solid rgba(148,163,184,.12); }
+    th { color: #cbd8f0; background: rgba(18,28,48,.86); font-size: 12px; text-transform: uppercase; letter-spacing: .06em; position: sticky; top: 0; z-index: 1; }
+    tbody tr:hover { background: rgba(24,35,58,.55); }
+    .severity-tag { display: inline-flex; align-items: center; gap: 6px; border-radius: 999px; padding: 6px 10px; font-size: 11px; font-weight: 800; letter-spacing: .04em; }
+    .severity-tag.critical { background: rgba(127,29,29,.35); color: #fecaca; }
+    .severity-tag.high { background: rgba(120,53,15,.35); color: #fcd9a6; }
+    .severity-tag.medium { background: rgba(30,58,138,.35); color: #bfd4ff; }
+    .severity-tag.low { background: rgba(6,78,59,.35); color: #bbf7d0; }
+    .tiny-link { color: #93c5fd; font-weight: 700; }
+    .charts-grid { display: grid; grid-template-columns: 1fr; gap: 18px; }
+    .chart-card, .summary-card, .insight-card, .recommendation-card {
+      background: linear-gradient(180deg, rgba(11,19,33,.96), rgba(8,13,23,.96));
+      border: 1px solid var(--border); border-radius: 22px; padding: 18px; box-shadow: var(--shadow);
+    }
+    .severity-summary { display: grid; grid-template-columns: 1fr; gap: 12px; margin-top: 14px; }
+    .severity-box {
+      background: linear-gradient(180deg, rgba(17,25,40,.95), rgba(8,13,23,.95)); border: 1px solid var(--border); border-radius: 18px; padding: 14px;
+      position: relative; overflow: hidden;
+    }
+    .severity-box::after { content: ''; position: absolute; width: 70px; height: 70px; right: -18px; top: -18px; border-radius: 50%; opacity: .18; }
+    .severity-box.critical::after { background: var(--red); }
+    .severity-box.high::after { background: var(--amber); }
+    .severity-box.medium::after { background: var(--blue); }
+    .severity-box.low::after { background: var(--green); }
+    .severity-box .label { color: #d4e0f7; font-size: 12px; text-transform: uppercase; letter-spacing: .08em; }
+    .severity-box .value { font-size: 40px; font-weight: 800; line-height: 1; margin: 8px 0 6px; }
+    .severity-box .count { color: var(--muted); font-size: 13px; }
+    .severity-box .insight { margin-top: 8px; font-size: 12px; color: #d8e4fb; }
+    .gauge {
+      height: 180px; display: grid; place-items: center;
+      background: radial-gradient(circle at center, rgba(59,130,246,.10), transparent 58%);
+    }
+    .gauge-ring {
+      width: 170px; height: 170px; border-radius: 50%; display: grid; place-items: center;
+      background: conic-gradient(from 180deg, #22c55e 0deg, #22c55e 72deg, #3b82f6 72deg, #3b82f6 144deg, #f59e0b 144deg, #f59e0b 216deg, #ef4444 216deg, #ef4444 288deg, rgba(255,255,255,.07) 288deg 360deg);
+      position: relative;
+      box-shadow: inset 0 0 0 1px rgba(255,255,255,.08), 0 12px 32px rgba(0,0,0,.25);
+    }
+    .gauge-ring::before {
+      content: ''; width: 118px; height: 118px; border-radius: 50%; background: #09111e; position: absolute;
+      box-shadow: inset 0 0 0 1px rgba(255,255,255,.08);
+    }
+    .gauge-center { position: relative; text-align: center; z-index: 1; }
+    .gauge-center .score { font-size: 40px; font-weight: 900; }
+    .gauge-center .status { font-size: 13px; color: var(--muted); font-weight: 700; }
+    .mini-chart { height: 300px; }
+    .insight-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+    .insight-item { background: rgba(8,13,23,.65); border: 1px solid var(--border); border-radius: 16px; padding: 14px; }
+    .insight-item h4 { margin: 0 0 8px; font-size: 14px; }
+    .insight-item p { margin: 0; font-size: 13px; color: var(--muted); line-height: 1.5; }
+    .empty-state { padding: 24px; text-align: center; color: var(--muted); }
+    .action-buttons { margin-top: 18px; display: none; }
+    .action-buttons.active { display: block; }
+    .action-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+    .action-btn {
+      border: 1px solid var(--border); border-radius: 20px; padding: 16px; cursor: pointer; text-align: left;
+      background: linear-gradient(135deg, rgba(24,34,58,.95), rgba(11,18,31,.95)); color: white;
+      transition: .18s ease; box-shadow: var(--shadow);
+    }
+    .action-btn:hover { transform: translateY(-2px); border-color: rgba(96,165,250,.38); }
+    .action-btn.primary { background: linear-gradient(135deg, rgba(102,126,234,.92), rgba(118,75,162,.92)); }
+    .action-btn .title { display: block; font-size: 15px; font-weight: 800; margin-bottom: 4px; }
+    .action-btn .desc { color: #d5dff6; font-size: 12px; }
+    .status-banner {
+      display: none; margin-top: 14px; padding: 14px 16px; border-radius: 18px; border: 1px solid rgba(96,165,250,.35);
+      background: rgba(15,23,42,.8); color: #dce9ff; font-weight: 700;
+    }
+    .spinner { width: 20px; height: 20px; border-radius: 50%; border: 3px solid rgba(255,255,255,.18); border-top-color: white; display: inline-block; vertical-align: middle; animation: spin 1s linear infinite; margin-right: 8px; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .toast {
+      position: fixed; right: 20px; top: 20px; z-index: 1000; background: rgba(10,18,31,.92); color: white; border: 1px solid var(--border);
+      padding: 14px 16px; border-radius: 16px; box-shadow: var(--shadow); min-width: 280px;
+    }
+    .hidden { display: none !important; }
+    @media (max-width: 1400px) {
+      .content-grid { grid-template-columns: 1fr; }
+      .hero-top { grid-template-columns: 1fr; }
+    }
+    @media (max-width: 1160px) {
+      .shell { grid-template-columns: 1fr; }
+      .sidebar { position: static; height: auto; }
+      .kpis, .action-grid { grid-template-columns: repeat(2, minmax(0,1fr)); }
+    }
+    @media (max-width: 760px) {
+      .main { padding: 16px; }
+      .kpis, .action-grid, .credentials-grid, .insight-grid { grid-template-columns: 1fr; }
+      .scan-grid { grid-template-columns: 1fr; }
+      .meta-row { flex-direction: column; align-items: stretch; }
+    }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="brand-icon">🛡️</div>
+        <div>
+          <h1>Security Multicloud Scanner</h1>
+          <p>Visão executiva + técnica para AWS S3, GCS e Azure Blob, integrada ao seu gerador de relatórios PDF/DOCX.</p>
+        </div>
+      </div>
+
+      <div class="sidebar-section">
+        <div class="section-head">
+          <h2>Histórico de scans</h2>
+          <button class="ghost-btn" onclick="clearHistory()">Limpar</button>
+        </div>
+        <div id="history-list" class="history-list"></div>
+      </div>
+
+      <div class="sidebar-section">
+        <div class="section-head">
+          <h2>Recomendações</h2>
+          <button class="ghost-btn" onclick="clearRecommendations()">Limpar</button>
+        </div>
+        <div id="recommendation-list-sidebar" class="recommendation-list"></div>
+      </div>
+    </aside>
+
+    <main class="main">
+      <div class="topbar">
+        <div class="meta-row">
+          <div id="provider-badge" class="pill provider-pill">Provider: -</div>
+          <div class="pill"><span>Region:</span> <strong id="region-value">-</strong></div>
+          <div class="pill"><span>Account:</span> <strong id="account-value">-</strong></div>
+          <div id="risk-pill" class="pill risk-pill"><span>Risco:</span> <strong>--</strong></div>
+        </div>
+        <div class="user-actions">
+          <div class="pill hidden" id="user-pill">👤 <strong id="user-name">-</strong></div>
+          <button id="logout-btn" class="logout-btn hidden" onclick="logout()">Sair</button>
+        </div>
+      </div>
+
+      <section class="hero">
+        <div class="hero-top">
+          <div>
+            <h2 class="hero-title">Enterprise dashboard para storage exposto</h2>
+            <p class="hero-sub">Refatoração completa do seu dashboard atual, preservando os endpoints existentes e aproximando a UX do estilo Wiz / Prisma Cloud. Seu frontend atual já tem filtros, cards de severidade e exportação fileciteturn2file1 fileciteturn2file2, enquanto o backend já entrega donut, heatmap, tipo de arquivo, volume e gauges individuais no gerador de relatórios fileciteturn2file8 fileciteturn2file9.</p>
+          </div>
+          <div class="hero-insight">
+            <h3>Resumo executivo</h3>
+            <p id="executive-insight">Execute um scan para ver o insight principal, comparação de severidade, exposição e recomendações de ação.</p>
+          </div>
+        </div>
+
+        <div class="scan-panel">
+          <div class="mode-toggle">
+            <button id="btn-mode-public" class="mode-btn active" onclick="setScanMode('public')">🌐 Scan público</button>
+            <button id="btn-mode-private" class="mode-btn" onclick="setScanMode('private')">🔐 Scan privado</button>
+          </div>
+
+          <div class="scan-grid">
+            <input id="bucket-input" class="input" placeholder="Ex.: bucket.s3.amazonaws.com, bucket.storage.googleapis.com, container.blob.core.windows.net" />
+            <button id="scan-btn" class="primary-btn" onclick="startScan()">Iniciar scan</button>
+          </div>
+
+          <div id="credentials-container" class="credentials-box">
+            <div class="warning"><strong>Modo autenticado:</strong> as credenciais são usadas apenas nesta sessão para o scan privado.</div>
+            <div class="credentials-grid">
+              <div class="input-group full">
+                <label>Provider</label>
+                <select id="provider-select" class="select" onchange="toggleProviderFields()">
+                  <option value="s3">AWS S3</option>
+                  <option value="gcs">Google Cloud Storage</option>
+                  <option value="azure">Azure Blob Storage</option>
+                </select>
+              </div>
+
+              <div id="aws-fields" class="full credentials-grid">
+                <div class="input-group">
+                  <label>AWS Access Key ID</label>
+                  <input id="aws-access-key" class="input" placeholder="AKIA..." />
+                  <small>Credencial do IAM / usuário / role temporária.</small>
+                </div>
+                <div class="input-group">
+                  <label>AWS Secret Access Key</label>
+                  <input id="aws-secret-key" class="input" type="password" placeholder="••••••••••••" />
+                  <small>Usada apenas para autenticar o scan.</small>
+                </div>
+                <div class="input-group">
+                  <label>Session Token</label>
+                  <input id="aws-session-token" class="input" type="password" placeholder="Opcional para STS" />
+                </div>
+                <div class="input-group">
+                  <label>Região AWS</label>
+                  <select id="aws-region" class="select">
+                    <option value="">Auto-detectar</option>
+                    <option value="us-east-1">us-east-1</option>
+                    <option value="us-east-2">us-east-2</option>
+                    <option value="us-west-1">us-west-1</option>
+                    <option value="us-west-2">us-west-2</option>
+                    <option value="sa-east-1">sa-east-1</option>
+                    <option value="eu-west-1">eu-west-1</option>
+                    <option value="eu-central-1">eu-central-1</option>
+                    <option value="ap-southeast-1">ap-southeast-1</option>
+                    <option value="ap-southeast-2">ap-southeast-2</option>
+                  </select>
+                </div>
+              </div>
+
+              <div id="gcs-fields" class="full input-group hidden">
+                <label>Service Account Key JSON</label>
+                <textarea id="gcs-service-account" class="textarea" placeholder='Cole o JSON completo da service account'></textarea>
+                <small>Mesmo fluxo do dashboard atual, mas com container mais limpo e responsivo.</small>
+              </div>
+
+              <div id="azure-fields" class="full credentials-grid hidden">
+                <div class="input-group full">
+                  <label>Azure Connection String</label>
+                  <textarea id="azure-connection-string" class="textarea" placeholder="DefaultEndpointsProtocol=https;AccountName=...;AccountKey=...;EndpointSuffix=core.windows.net"></textarea>
+                </div>
+                <div class="input-group">
+                  <label>Azure SAS Token</label>
+                  <input id="azure-sas-token" class="input" placeholder="?sv=..." />
+                </div>
+                <div class="input-group">
+                  <label>Azure Account Key</label>
+                  <input id="azure-account-key" type="password" class="input" placeholder="••••••••••••" />
+                </div>
+                <div class="input-group full">
+                  <label>Azure Container</label>
+                  <input id="azure-container" class="input" placeholder="growbiz" />
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="results-root" class="results">
+        <div class="kpis">
+          <div class="kpi">
+            <div class="kpi-label">Total de arquivos</div>
+            <div id="total-files" class="kpi-value">0</div>
+            <div class="kpi-sub">Objetos avaliados no scan.</div>
+          </div>
+          <div class="kpi">
+            <div class="kpi-label">Volume total</div>
+            <div id="total-size" class="kpi-value">0 B</div>
+            <div class="kpi-sub">Somatório dos objetos analisados.</div>
+          </div>
+          <div class="kpi">
+            <div class="kpi-label">Exposição</div>
+            <div id="exposure-status" class="kpi-value">-</div>
+            <div id="exposure-detail" class="kpi-sub">Nenhum dado disponível.</div>
+          </div>
+          <div class="kpi">
+            <div class="kpi-label">Risco total</div>
+            <div id="risk-total-value" class="kpi-value">--</div>
+            <div class="kpi-sub">Pontuação consolidada.</div>
+          </div>
+        </div>
+
+        <div class="content-grid">
+          <section class="panel">
+            <div class="panel-head">
+              <div>
+                <h3 class="panel-title">Arquivos expostos</h3>
+                <p class="panel-subtitle">Filtros técnicos + ações de triagem sobre a tabela principal.</p>
+              </div>
+              <div class="bulk-head">
+                <button class="ghost-btn" id="btn-select-all" onclick="selectAllFiles()">Selecionar todos</button>
+                <button class="danger-ghost" id="btn-delete-selected" onclick="deleteSelectedFiles()" disabled>Excluir selecionados (<span id="selected-count">0</span>)</button>
+              </div>
+            </div>
+
+            <div class="filter-bar">
+              <strong style="font-size:12px;color:#cbd8f0;align-self:center;">Severidade</strong>
+              <button class="sev-btn critical active" data-level="CRITICAL" onclick="toggleSeverity('CRITICAL', this)">Critical</button>
+              <button class="sev-btn high active" data-level="HIGH" onclick="toggleSeverity('HIGH', this)">High</button>
+              <button class="sev-btn medium active" data-level="MEDIUM" onclick="toggleSeverity('MEDIUM', this)">Medium</button>
+              <button class="sev-btn low active" data-level="LOW" onclick="toggleSeverity('LOW', this)">Low</button>
+              <span class="filter-spacer"></span>
+              <select id="ext-filter" class="select" style="max-width:180px" onchange="setExtensionFilter(this.value)">
+                <option value="ALL">Todas as extensões</option>
+              </select>
+              <input id="search-filter" class="input" style="max-width:260px" placeholder="Buscar nome, extensão, severidade" oninput="setSearchFilter(this.value)" />
+              <button class="ghost-btn" onclick="resetFilters()">Resetar</button>
+            </div>
+
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th style="width:44px;"><input type="checkbox" id="checkbox-select-all" onchange="toggleSelectAll(this.checked)" /></th>
+                    <th>Objeto / caminho</th>
+                    <th>Tamanho</th>
+                    <th>Severidade</th>
+                    <th>Motivo</th>
+                    <th>Ação</th>
+                  </tr>
+                </thead>
+                <tbody id="file-table-body">
+                  <tr><td colspan="6" class="empty-state">Nenhum scan executado.</td></tr>
+                </tbody>
+              </table>
+            </div>
+            <div id="pagination-controls"></div>
+          </section>
+
+          <section class="charts-grid">
+            <div class="summary-card">
+              <div class="panel-head">
+                <div>
+                  <h3 class="panel-title">Score executivo</h3>
+                  <p class="panel-subtitle">Leitura rápida do estado geral, preservando sua lógica atual de score no backend fileciteturn2file7.</p>
+                </div>
+              </div>
+              <div class="gauge">
+                <div class="gauge-ring">
+                  <div class="gauge-center">
+                    <div class="score" id="gauge-score">0</div>
+                    <div class="status" id="gauge-status">Sem scan</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="chart-card">
+              <div class="panel-head">
+                <div>
+                  <h3 class="panel-title">Distribuição de severidade</h3>
+                  <p class="panel-subtitle">Refatoração do gráfico atual com barras mais limpas, clique para filtrar e cards mais explicativos.</p>
+                </div>
+              </div>
+              <div class="mini-chart"><canvas id="severityChart"></canvas></div>
+              <div id="severity-summary" class="severity-summary"></div>
+            </div>
+
+            <div class="chart-card">
+              <div class="panel-head">
+                <div>
+                  <h3 class="panel-title">Volume por severidade</h3>
+                  <p class="panel-subtitle">Mostra MB/GB por faixa de risco, algo que o seu dashboard atual ainda não destaca visualmente.</p>
+                </div>
+              </div>
+              <div class="mini-chart"><canvas id="volumeChart"></canvas></div>
+            </div>
+
+            <div class="chart-card">
+              <div class="panel-head">
+                <div>
+                  <h3 class="panel-title">Top arquivos por risco</h3>
+                  <p class="panel-subtitle">Apoia o drill-down técnico com base nos arquivos já retornados pela API.</p>
+                </div>
+              </div>
+              <div class="mini-chart"><canvas id="topRiskChart"></canvas></div>
+            </div>
+          </section>
+        </div>
+
+        <section class="panel" style="margin-top:18px;">
+          <div class="panel-head">
+            <div>
+              <h3 class="panel-title">Insights de risco</h3>
+              <p class="panel-subtitle">Resumo executivo derivado dos dados do scan e alinhado às recomendações e aos gráficos do relatório Python. O gerador atual já produz heatmap, tipo de arquivo e gauges individuais fileciteturn2file8.</p>
+            </div>
+          </div>
+          <div class="insight-grid">
+            <div class="insight-item">
+              <h4>Leitura executiva</h4>
+              <p id="insight-executive">Execute um scan para carregar a recomendação executiva.</p>
+            </div>
+            <div class="insight-item">
+              <h4>Foco técnico</h4>
+              <p id="insight-technical">O top de arquivos e a distribuição de volume aparecem aqui após o scan.</p>
+            </div>
+            <div class="insight-item">
+              <h4>Comparação de severidade</h4>
+              <p id="insight-severity">Critical, High, Medium e Low serão analisados automaticamente.</p>
+            </div>
+            <div class="insight-item">
+              <h4>Ação sugerida</h4>
+              <p id="insight-action">Use esta área para orientar o time de SecOps ou DevOps.</p>
+            </div>
+          </div>
+        </section>
+
+        <section id="action-buttons" class="action-buttons">
+          <div class="action-grid">
+            <button class="action-btn primary" onclick="generateExecutiveReport()">
+              <span class="title">Relatório executivo</span>
+              <span class="desc">Gera PDF + DOCX com o fluxo já suportado pelo backend.</span>
+            </button>
+            <button class="action-btn" onclick="exportJSON()">
+              <span class="title">Exportar JSON</span>
+              <span class="desc">Baixa o resultado bruto do scan atual.</span>
+            </button>
+            <button class="action-btn" onclick="exportCSV()">
+              <span class="title">Exportar CSV</span>
+              <span class="desc">Tabela pronta para triagem técnica e evidência.</span>
+            </button>
+            <button class="action-btn" onclick="shareResults()">
+              <span class="title">Compartilhar</span>
+              <span class="desc">Gera link com o snapshot do scan atual.</span>
+            </button>
+          </div>
+          <div id="report-status" class="status-banner"></div>
+        </section>
+      </section>
+    </main>
+  </div>
+
+  <script>
+    let scanMode = 'public';
+    let selectedHistoryIndex = null;
+    let severityChart = null;
+    let volumeChart = null;
+    let topRiskChart = null;
+    let fullFileList = [];
+    let globalResult = null;
+    let selectedSeverities = new Set(['CRITICAL','HIGH','MEDIUM','LOW']);
+    let selectedExtension = 'ALL';
+    let searchQuery = '';
+    let currentPage = 1;
+    let itemsPerPage = 10;
+
+    const riskColors = {
+      CRITICAL: '#ef4444',
+      HIGH: '#f59e0b',
+      MEDIUM: '#3b82f6',
+      LOW: '#22c55e',
+      '--': '#64748b'
+    };
+
+    function getAuthToken() {
+      return (localStorage.getItem('scanner_token') || localStorage.getItem('token') || '').trim();
+    }
+
+    function showToast(message) {
+      const old = document.querySelector('.toast');
+      if (old) old.remove();
+      const toast = document.createElement('div');
+      toast.className = 'toast';
+      toast.textContent = message;
+      document.body.appendChild(toast);
+      setTimeout(() => toast.remove(), 3200);
+    }
+
+    function setUserHeader(user) {
+      const name = (user && (user.full_name || user.name || user.email)) ||
+        localStorage.getItem('user_full_name') || localStorage.getItem('user_email') || '-';
+      document.getElementById('user-name').textContent = name;
+      document.getElementById('user-pill').classList.remove('hidden');
+      document.getElementById('logout-btn').classList.remove('hidden');
+    }
+
+    async function verifyAuthOrRedirect() {
+      const token = getAuthToken();
+      if (!token) { window.location.href = '/login'; return; }
+      try {
+        const res = await fetch('/api/dashboard', {
+          method: 'GET', credentials: 'include', headers: { Authorization: `Bearer ${token}` }
+        });
+        if (!res.ok) { window.location.href = '/login'; return; }
+        const data = await res.json();
+        const user = data.user || data;
+        if (user && user.mfa_enabled === false) { window.location.href = '/mfa/setup'; return; }
+        setUserHeader(user);
+      } catch {
+        window.location.href = '/login';
+      }
+    }
+
+    function logout() {
+      const token = getAuthToken();
+      ['scanner_token','token','auth_token','temp_token','scanner_user','scanner_email','user_email','user_full_name','user_name']
+        .forEach(k => { try { localStorage.removeItem(k); sessionStorage.removeItem(k); } catch {} });
+      fetch('/auth/logout', { method: 'POST', credentials: 'include', headers: token ? { Authorization: `Bearer ${token}` } : {} }).catch(() => {});
+      window.location.replace('/login');
+    }
+
+    function setScanMode(mode) {
+      scanMode = mode;
+      document.getElementById('btn-mode-public').classList.toggle('active', mode === 'public');
+      document.getElementById('btn-mode-private').classList.toggle('active', mode === 'private');
+      document.getElementById('credentials-container').classList.toggle('active', mode === 'private');
+    }
+
+    function toggleProviderFields() {
+      const provider = document.getElementById('provider-select').value;
+      document.getElementById('aws-fields').classList.toggle('hidden', provider !== 's3');
+      document.getElementById('gcs-fields').classList.toggle('hidden', provider !== 'gcs');
+      document.getElementById('azure-fields').classList.toggle('hidden', provider !== 'azure');
+    }
+
+    function startScan() {
+      const bucket = document.getElementById('bucket-input').value.trim();
+      if (!bucket) { showToast('Digite o bucket/domínio para iniciar o scan.'); return; }
+      if (scanMode === 'public') startPublicScan(bucket); else startPrivateScan(bucket);
+    }
+
+    function setLoading(loading, text) {
+      const btn = document.getElementById('scan-btn');
+      btn.disabled = loading;
+      btn.textContent = loading ? (text || 'Scaneando...') : 'Iniciar scan';
+    }
+
+    function getAuthHeaders(extra = {}) {
+      const token = getAuthToken();
+      return {
+        ...extra,
+        ...(token ? { Authorization: `Bearer ${token}` } : {})
+      };
+    }
+
+    async function startPublicScan(bucket) {
+      setLoading(true, 'Scaneando...');
+      resetFilters();
+      try {
+        const res = await fetch(`/scan/${encodeURIComponent(bucket)}`, { credentials: 'include', headers: getAuthHeaders() });
+        const data = await res.json();
+        if (data.error || data.detail) throw new Error(data.error || data.detail);
+        updateUI(data);
+        saveScanToHistory(data);
+        showActionButtons();
+        showToast('Scan público concluído com sucesso.');
+      } catch (e) {
+        showToast(`Erro no scan: ${e.message}`);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    async function startPrivateScan(bucket) {
+      const provider = document.getElementById('provider-select').value;
+      const providerMap = { s3: 'AWS_S3', gcs: 'GCS', azure: 'AZURE_BLOB' };
+      const payload = { bucket, provider: providerMap[provider] || provider.toUpperCase(), max_objects: 1000 };
+
+      if (provider === 's3') {
+        const access = document.getElementById('aws-access-key').value.trim();
+        const secret = document.getElementById('aws-secret-key').value.trim();
+        const session = document.getElementById('aws-session-token').value.trim();
+        const region = document.getElementById('aws-region').value.trim();
+        if (!access || !secret) { showToast('Informe Access Key e Secret Key da AWS.'); return; }
+        Object.assign(payload, {
+          aws_access_key_id: access,
+          aws_secret_access_key: secret,
+          aws_session_token: session || null,
+          region: region || null
+        });
+      } else if (provider === 'gcs') {
+        const serviceAccount = document.getElementById('gcs-service-account').value.trim();
+        if (!serviceAccount) { showToast('Cole o JSON da service account do GCS.'); return; }
+        try { payload.service_account_key = JSON.parse(serviceAccount); }
+        catch { showToast('JSON do GCS inválido.'); return; }
+      } else if (provider === 'azure') {
+        const connection = document.getElementById('azure-connection-string').value.trim();
+        const sas = document.getElementById('azure-sas-token').value.trim();
+        const key = document.getElementById('azure-account-key').value.trim();
+        const container = document.getElementById('azure-container').value.trim();
+        if (!connection && !sas && !key) { showToast('Informe Connection String, SAS Token ou Account Key do Azure.'); return; }
+        Object.assign(payload, {
+          azure_connection_string: connection || null,
+          azure_sas_token: sas || null,
+          azure_account_key: key || null,
+          azure_container: container || null
+        });
+      }
+
+      setLoading(true, 'Scaneando com credenciais...');
+      resetFilters();
+      try {
+        const res = await fetch('/scan/authenticated', {
+          method: 'POST',
+          credentials: 'include',
+          headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+          body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+        if (data.error || data.detail) throw new Error(data.error || data.detail);
+        updateUI(data);
+        saveScanToHistory(data);
+        showActionButtons();
+        showToast('Scan autenticado concluído com sucesso.');
+      } catch (e) {
+        showToast(`Erro no scan autenticado: ${e.message}`);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    function showResultsSections() {
+      document.getElementById('results-root').classList.add('active');
+    }
+
+    function updateProviderBadge(provider) {
+      const el = document.getElementById('provider-badge');
+      el.className = 'pill provider-pill';
+      el.textContent = `Provider: ${provider || '-'}`;
+      if (provider) el.classList.add(`provider-${provider}`);
+    }
+
+    function updateRegionAccount(region, accountId) {
+      document.getElementById('region-value').textContent = region || '-';
+      document.getElementById('account-value').textContent = accountId || '-';
+    }
+
+    function calcRiskLevel(score) {
+      if (score >= 80) return 'CRITICAL';
+      if (score >= 60) return 'HIGH';
+      if (score >= 30) return 'MEDIUM';
+      if (score > 0) return 'LOW';
+      return '--';
+    }
+
+    function updateRiskBadge(level, score) {
+      const pill = document.getElementById('risk-pill');
+      pill.className = 'pill risk-pill';
+      if (level === '--') {
+        pill.innerHTML = '<span>Risco:</span> <strong>--</strong>';
+        return;
+      }
+      pill.classList.add(level.toLowerCase());
+      pill.innerHTML = `<span>Risco:</span> <strong>${level} (${score}%)</strong>`;
+      document.getElementById('gauge-score').textContent = score;
+      document.getElementById('gauge-status').textContent = level;
+      document.querySelector('.gauge-ring').style.background = `conic-gradient(from 180deg, #22c55e 0deg, #22c55e 72deg, #3b82f6 72deg, #3b82f6 144deg, #f59e0b 144deg, #f59e0b 216deg, #ef4444 216deg, #ef4444 288deg, rgba(255,255,255,.07) 288deg 360deg)`;
+    }
+
+    function updateExecutiveInsight(data) {
+      const total = (data.files || []).length;
+      const sd = data.severity_distribution || {};
+      const riskScore = typeof data.risk_score === 'number' ? data.risk_score : 0;
+      const exposure = data.public_access ? 'pública' : 'restrita';
+      const critical = sd.critical || 0;
+      const high = sd.high || 0;
+      const medium = sd.medium || 0;
+      const low = sd.low || 0;
+      const dominant = Object.entries({ CRITICAL: critical, HIGH: high, MEDIUM: medium, LOW: low }).sort((a,b)=>b[1]-a[1])[0] || ['LOW',0];
+      const topFile = (data.files || []).slice().sort((a,b)=>(Number(b.size)||0)-(Number(a.size)||0))[0];
+      const totalSize = formatBytes((data.files || []).reduce((acc,f)=>acc + Number(f.size || 0), 0));
+
+      document.getElementById('executive-insight').textContent =
+        `Foram avaliados ${total} arquivos (${totalSize}). A exposição está ${exposure} e a severidade dominante é ${dominant[0]} com ${dominant[1]} arquivo(s). Score atual: ${riskScore}%.`;
+
+      document.getElementById('insight-executive').textContent =
+        critical > 0 || high > 0
+          ? `Há ${critical} crítico(s) e ${high} alto(s). Priorize contenção imediata e revisão de acesso.`
+          : `Sem achados críticos ou altos. O foco está em hardening, governança e redução de exposição residual.`;
+
+      document.getElementById('insight-technical').textContent = topFile
+        ? `Maior objeto observado: ${topFile.key || topFile.name || 'arquivo'} com ${formatBytes(topFile.size || 0)}.`
+        : 'Nenhum arquivo retornado pelo scan.';
+
+      document.getElementById('insight-severity').textContent =
+        `Critical: ${critical}, High: ${high}, Medium: ${medium}, Low: ${low}. Use o gráfico para filtrar a tabela clicando na severidade.`;
+
+      document.getElementById('insight-action').textContent = data.public_access
+        ? 'Ação imediata: revisar bloqueio público, ACLs, bucket policies / IAM bindings e versionamento.'
+        : 'Ação sugerida: fortalecer políticas, observabilidade e revisão de conteúdo sensível.';
+    }
+
+    function updateUI(data) {
+      globalResult = data;
+      showResultsSections();
+      updateProviderBadge(data.provider || 'UNIVERSAL');
+      updateRegionAccount(data.region || '-', data.account_id || '-');
+      const riskScore = typeof data.risk_score === 'number' ? data.risk_score : 0;
+      updateRiskBadge(calcRiskLevel(riskScore), riskScore);
+
+      const files = data.files || [];
+      const totalBytes = (data.summary && data.summary.total_size_bytes) || files.reduce((acc,f)=>acc + Number(f.size || 0), 0);
+      document.getElementById('total-files').textContent = (data.summary && (data.summary.objects_scanned || data.summary.total_files)) || files.length || 0;
+      document.getElementById('total-size').textContent = formatBytes(totalBytes);
+      document.getElementById('exposure-status').textContent = data.public_access ? 'Público' : 'Privado';
+      document.getElementById('exposure-detail').textContent = data.public_access ? 'Listagem ou acesso público detectado.' : 'Sem listagem pública detectada.';
+      document.getElementById('risk-total-value').textContent = `${riskScore}%`;
+
+      updateExecutiveInsight(data);
+      updateRecommendations(data.recommendations || []);
+      updateFileList(files);
+    }
+
+    function updateRecommendations(list) {
+      const box = document.getElementById('recommendation-list-sidebar');
+      box.innerHTML = '';
+      if (!list.length) {
+        box.innerHTML = `<div class="recommendation-item"><span class="rec-priority">INFO</span><div class="rec-text">Nenhuma recomendação disponível.</div></div>`;
+        return;
+      }
+      list.slice(0, 8).forEach((rec, idx) => {
+        const item = document.createElement('div');
+        item.className = 'recommendation-item';
+        const isCritical = /urgente|imediat|crític/i.test(rec);
+        item.innerHTML = `<span class="rec-priority">${isCritical ? 'ALTA PRIORIDADE' : 'RECOMENDAÇÃO ' + (idx+1)}</span><div class="rec-text">${escapeHtml(rec)}</div>`;
+        box.appendChild(item);
+      });
+    }
+
+    function normalizeSeverity(sev) {
+      return String(sev || 'LOW').toUpperCase();
+    }
+
+    function getSeverityClass(sev) {
+      return normalizeSeverity(sev).toLowerCase();
+    }
+
+    function fillExtensionFilter(files) {
+      const select = document.getElementById('ext-filter');
+      const current = selectedExtension;
+      const exts = Array.from(new Set(files.map(f => {
+        const key = (f.key || f.name || '').trim();
+        const dot = key.lastIndexOf('.');
+        return dot > -1 ? key.slice(dot).toLowerCase() : '(sem ext)';
+      }))).sort();
+      select.innerHTML = '<option value="ALL">Todas as extensões</option>' + exts.map(ext => `<option value="${ext}">${ext}</option>`).join('');
+      select.value = exts.includes(current) ? current : 'ALL';
+    }
+
+    function updateFileList(files) {
+      fullFileList = (files || []).map(f => ({ ...f, severity: normalizeSeverity(f.severity) }));
+      fillExtensionFilter(fullFileList);
+      currentPage = 1;
+      applyFilters();
+    }
+
+    function getFilteredFiles() {
+      let filtered = fullFileList.slice();
+      if (selectedSeverities.size) filtered = filtered.filter(f => selectedSeverities.has(normalizeSeverity(f.severity)));
+      if (selectedExtension !== 'ALL') {
+        filtered = filtered.filter(f => {
+          const key = (f.key || f.name || '').toLowerCase();
+          return selectedExtension === '(sem ext)' ? !key.includes('.') : key.endsWith(selectedExtension.toLowerCase());
+        });
+      }
+      if (searchQuery) {
+        filtered = filtered.filter(f => {
+          const key = (f.key || f.name || '').toLowerCase();
+          const reason = (f.reason || '').toLowerCase();
+          const sev = normalizeSeverity(f.severity).toLowerCase();
+          return key.includes(searchQuery) || reason.includes(searchQuery) || sev.includes(searchQuery);
+        });
+      }
+      return filtered;
+    }
+
+    function renderFileTable(files) {
+      const tbody = document.getElementById('file-table-body');
+      tbody.innerHTML = '';
+      if (!files.length) {
+        tbody.innerHTML = '<tr><td colspan="6" class="empty-state">Nenhum arquivo encontrado com os filtros atuais.</td></tr>';
+        updateSelectedCount();
+        updatePaginationControls(0);
+        return;
+      }
+      const totalPages = Math.ceil(files.length / itemsPerPage);
+      if (currentPage > totalPages) currentPage = totalPages || 1;
+      const start = (currentPage - 1) * itemsPerPage;
+      const end = Math.min(start + itemsPerPage, files.length);
+      files.slice(start, end).forEach((f, idx) => {
+        const key = f.key || f.name || '-';
+        const sev = normalizeSeverity(f.severity);
+        const sevClass = getSeverityClass(sev);
+        const row = document.createElement('tr');
+        row.innerHTML = `
+          <td><input type="checkbox" class="file-checkbox" data-file-key="${escapeHtml(key)}" data-file-index="${start + idx}" onchange="updateSelectedCount()"></td>
+          <td><div style="font-weight:700;color:#f5f9ff;word-break:break-word;max-width:520px;">${escapeHtml(key)}</div></td>
+          <td>${formatBytes(f.size || 0)}</td>
+          <td><span class="severity-tag ${sevClass}">${sev}</span></td>
+          <td style="color:#9fb2cf;max-width:240px;">${escapeHtml((f.reason || 'Exposição detectada').slice(0, 120))}</td>
+          <td>${f.url || f.url_host ? `<a class="tiny-link" href="${f.url || f.url_host}" target="_blank">Abrir</a>` : '-'}</td>
+        `;
+        tbody.appendChild(row);
+      });
+      updateSelectedCount();
+      updatePaginationControls(files.length);
+    }
+
+    function updatePaginationControls(totalItems) {
+      const box = document.getElementById('pagination-controls');
+      if (totalItems <= itemsPerPage) { box.innerHTML = ''; return; }
+      const totalPages = Math.ceil(totalItems / itemsPerPage);
+      const startItem = (currentPage - 1) * itemsPerPage + 1;
+      const endItem = Math.min(currentPage * itemsPerPage, totalItems);
+      box.innerHTML = `
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;padding:12px 4px 2px;flex-wrap:wrap;">
+          <div style="color:var(--muted);font-size:13px;">Mostrando <strong style="color:white">${startItem}-${endItem}</strong> de <strong style="color:white">${totalItems}</strong> arquivos</div>
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+            <button class="ghost-btn" ${currentPage===1?'disabled':''} onclick="goToPage(1)">Primeira</button>
+            <button class="ghost-btn" ${currentPage===1?'disabled':''} onclick="goToPage(${currentPage-1})">Anterior</button>
+            <div class="pill">Página <strong>${currentPage}</strong> de <strong>${totalPages}</strong></div>
+            <button class="ghost-btn" ${currentPage===totalPages?'disabled':''} onclick="goToPage(${currentPage+1})">Próxima</button>
+            <button class="ghost-btn" ${currentPage===totalPages?'disabled':''} onclick="goToPage(${totalPages})">Última</button>
+          </div>
+        </div>`;
+    }
+
+    function goToPage(page) {
+      const filtered = getFilteredFiles();
+      const totalPages = Math.max(1, Math.ceil(filtered.length / itemsPerPage));
+      currentPage = Math.max(1, Math.min(page, totalPages));
+      renderFileTable(filtered);
+    }
+
+    function computeSeverityDist(files) {
+      return {
+        critical: files.filter(f => normalizeSeverity(f.severity) === 'CRITICAL').length,
+        high: files.filter(f => normalizeSeverity(f.severity) === 'HIGH').length,
+        medium: files.filter(f => normalizeSeverity(f.severity) === 'MEDIUM').length,
+        low: files.filter(f => normalizeSeverity(f.severity) === 'LOW').length
+      };
+    }
+
+    function destroyChart(chart) { if (chart) chart.destroy(); }
+
+    function updateSeverityChart(dist) {
+      const values = [dist.critical || 0, dist.high || 0, dist.medium || 0, dist.low || 0];
+      const labels = ['Critical', 'High', 'Medium', 'Low'];
+      const colors = ['#ef4444', '#f59e0b', '#3b82f6', '#22c55e'];
+      const total = values.reduce((a,b)=>a+b,0);
+      destroyChart(severityChart);
+      const ctx = document.getElementById('severityChart');
+      severityChart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels,
+          datasets: [{
+            data: values,
+            backgroundColor: values.map((v, i) => v === 0 ? colors[i] + '33' : colors[i]),
+            borderColor: colors,
+            borderWidth: 1.4,
+            borderRadius: 14,
+            maxBarThickness: 56,
+            minBarLength: 0
+          }]
+        },
+        options: {
+          maintainAspectRatio: false,
+          animation: { duration: 500 },
+          plugins: {
+            legend: { display: false },
+            datalabels: {
+              display: ctx => ctx.dataset.data[ctx.dataIndex] > 0,
+              anchor: 'end', align: 'end', offset: 6,
+              color: '#fff',
+              font: { weight: '800', size: 12 },
+              formatter: (value) => {
+                if (!total) return '';
+                return `${((value/total)*100).toFixed(1)}%\n${value} arquivo${value!==1?'s':''}`;
+              },
+              textStrokeColor: 'rgba(0,0,0,.8)', textStrokeWidth: 3, textAlign: 'center'
+            },
+            tooltip: {
+              backgroundColor: 'rgba(7,11,20,.95)', titleColor: '#fff', bodyColor: '#dce8fb', borderColor: 'rgba(148,163,184,.24)', borderWidth: 1,
+              callbacks: {
+                label: (ctx) => `${ctx.label}: ${ctx.parsed.y} arquivo(s) • ${total ? ((ctx.parsed.y/total)*100).toFixed(1) : '0.0'}%`
+              }
+            }
+          },
+          scales: {
+            x: {
+              ticks: { color: '#e7efff', font: { weight: '700' } },
+              grid: { display: false }
+            },
+            y: {
+              beginAtZero: true,
+              ticks: { color: '#91a4c4', precision: 0 },
+              grid: { color: 'rgba(148,163,184,.1)' },
+              title: { display: true, text: 'Quantidade de Arquivos', color: '#c8d7f3', font: { weight: '700' } }
+            }
+          },
+          onClick: (_, items) => {
+            if (!items.length) return;
+            const level = ['CRITICAL','HIGH','MEDIUM','LOW'][items[0].index];
+            const btn = document.querySelector(`.sev-btn[data-level="${level}"]`);
+            if (btn) toggleSeverity(level, btn, true);
+          }
+        },
+        plugins: [ChartDataLabels]
+      });
+      updateSeveritySummary(dist, total);
+    }
+
+    function updateSeveritySummary(dist, total) {
+      const box = document.getElementById('severity-summary');
+      const data = [
+        { label: 'Critical', value: dist.critical || 0, className: 'critical', insight: 'Resposta imediata requerida.' },
+        { label: 'High', value: dist.high || 0, className: 'high', insight: 'Correção prioritária recomendada.' },
+        { label: 'Medium', value: dist.medium || 0, className: 'medium', insight: 'Revisão técnica e hardening.' },
+        { label: 'Low', value: dist.low || 0, className: 'low', insight: 'Governança e monitoração contínua.' }
+      ];
+      box.innerHTML = data.map(item => {
+        const pct = total ? ((item.value / total) * 100).toFixed(1) : '0.0';
+        return `
+          <div class="severity-box ${item.className}">
+            <div class="label">${item.label}</div>
+            <div class="value" style="color:${riskColors[item.label.toUpperCase()] || '#fff'}">${pct}%</div>
+            <div class="count">${item.value} arquivo${item.value !== 1 ? 's' : ''}</div>
+            <div class="insight">${item.value > 0 ? item.insight : 'Sem achados nesta faixa.'}</div>
+          </div>`;
+      }).join('');
+    }
+
+    function updateVolumeChart(files) {
+      const buckets = { CRITICAL: 0, HIGH: 0, MEDIUM: 0, LOW: 0 };
+      files.forEach(f => { buckets[normalizeSeverity(f.severity)] += Number(f.size || 0); });
+      const labels = ['Critical','High','Medium','Low'];
+      const valuesMb = [buckets.CRITICAL, buckets.HIGH, buckets.MEDIUM, buckets.LOW].map(v => +(v / (1024*1024)).toFixed(2));
+      destroyChart(volumeChart);
+      volumeChart = new Chart(document.getElementById('volumeChart'), {
+        type: 'bar',
+        data: {
+          labels,
+          datasets: [{
+            data: valuesMb,
+            backgroundColor: ['rgba(239,68,68,.82)','rgba(245,158,11,.82)','rgba(59,130,246,.82)','rgba(34,197,94,.82)'],
+            borderColor: ['#ef4444','#f59e0b','#3b82f6','#22c55e'],
+            borderWidth: 1.4,
+            borderRadius: 14,
+            maxBarThickness: 50
+          }]
+        },
+        options: {
+          maintainAspectRatio: false,
+          plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => `${ctx.label}: ${ctx.parsed.y} MB` } } },
+          scales: {
+            x: { ticks: { color: '#e7efff', font: { weight: '700' } }, grid: { display: false } },
+            y: { beginAtZero: true, ticks: { color: '#91a4c4' }, grid: { color: 'rgba(148,163,184,.1)' }, title: { display: true, text: 'Volume (MB)', color: '#c8d7f3', font: { weight: '700' } } }
+          }
+        }
+      });
+    }
+
+    function scoreFile(file, maxSize) {
+      const baseMap = { CRITICAL: 87, HIGH: 62, MEDIUM: 37, LOW: 12 };
+      const sev = normalizeSeverity(file.severity);
+      const base = baseMap[sev] || 12;
+      const size = Number(file.size || 0);
+      const bonus = maxSize > 0 ? (size / maxSize) * 12 : 0;
+      return Math.min(100, base + bonus);
+    }
+
+    function updateTopRiskChart(files) {
+      const maxSize = Math.max(1, ...files.map(f => Number(f.size || 0)));
+      const top = files.slice().sort((a, b) => scoreFile(b, maxSize) - scoreFile(a, maxSize)).slice(0, 8);
+      destroyChart(topRiskChart);
+      topRiskChart = new Chart(document.getElementById('topRiskChart'), {
+        type: 'bar',
+        data: {
+          labels: top.map(f => ((f.key || f.name || '-').slice(-28))),
+          datasets: [{
+            data: top.map(f => +scoreFile(f, maxSize).toFixed(1)),
+            backgroundColor: top.map(f => riskColors[normalizeSeverity(f.severity)] || '#22c55e'),
+            borderRadius: 10,
+            maxBarThickness: 22
+          }]
+        },
+        options: {
+          indexAxis: 'y',
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { display: false },
+            tooltip: { callbacks: { label: ctx => `${ctx.parsed.x} pts` } }
+          },
+          scales: {
+            y: { ticks: { color: '#dce8fb', font: { size: 11 } }, grid: { display: false } },
+            x: { beginAtZero: true, max: 100, ticks: { color: '#91a4c4' }, grid: { color: 'rgba(148,163,184,.1)' }, title: { display: true, text: 'Score', color: '#c8d7f3', font: { weight: '700' } } }
+          }
+        }
+      });
+    }
+
+    function applyFilters() {
+      const filtered = getFilteredFiles();
+      renderFileTable(filtered);
+      const dist = computeSeverityDist(filtered);
+      updateSeverityChart(dist);
+      updateVolumeChart(filtered);
+      updateTopRiskChart(filtered);
+    }
+
+    function toggleSeverity(level, btn, exclusive = false) {
+      if (exclusive) {
+        selectedSeverities = new Set([level]);
+        document.querySelectorAll('.sev-btn').forEach(el => el.classList.toggle('active', el.dataset.level === level));
+      } else {
+        if (selectedSeverities.has(level)) {
+          selectedSeverities.delete(level);
+          btn.classList.remove('active');
+        } else {
+          selectedSeverities.add(level);
+          btn.classList.add('active');
+        }
+        if (selectedSeverities.size === 0) {
+          selectedSeverities = new Set(['CRITICAL','HIGH','MEDIUM','LOW']);
+          document.querySelectorAll('.sev-btn').forEach(el => el.classList.add('active'));
+        }
+      }
+      currentPage = 1;
+      applyFilters();
+    }
+
+    function setExtensionFilter(ext) { selectedExtension = ext; currentPage = 1; applyFilters(); }
+    function setSearchFilter(val) { searchQuery = (val || '').trim().toLowerCase(); currentPage = 1; applyFilters(); }
+
+    function resetFilters() {
+      selectedSeverities = new Set(['CRITICAL','HIGH','MEDIUM','LOW']);
+      selectedExtension = 'ALL';
+      searchQuery = '';
+      currentPage = 1;
+      document.querySelectorAll('.sev-btn').forEach(el => el.classList.add('active'));
+      document.getElementById('ext-filter').value = 'ALL';
+      document.getElementById('search-filter').value = '';
+      if (fullFileList.length) applyFilters();
+    }
+
+    function updateSelectedCount() {
+      const all = document.querySelectorAll('.file-checkbox');
+      const checked = document.querySelectorAll('.file-checkbox:checked');
+      document.getElementById('selected-count').textContent = checked.length;
+      document.getElementById('btn-delete-selected').disabled = checked.length === 0;
+      const master = document.getElementById('checkbox-select-all');
+      master.checked = checked.length > 0 && checked.length === all.length;
+      master.indeterminate = checked.length > 0 && checked.length < all.length;
+      document.getElementById('btn-select-all').textContent = checked.length === all.length && all.length ? 'Desselecionar todos' : 'Selecionar todos';
+    }
+
+    function toggleSelectAll(checked) { document.querySelectorAll('.file-checkbox').forEach(cb => cb.checked = checked); updateSelectedCount(); }
+    function selectAllFiles() {
+      const all = document.querySelectorAll('.file-checkbox');
+      const checked = document.querySelectorAll('.file-checkbox:checked');
+      const shouldSelect = checked.length !== all.length;
+      all.forEach(cb => cb.checked = shouldSelect);
+      updateSelectedCount();
+    }
+
+    function deleteSelectedFiles() {
+      const checked = Array.from(document.querySelectorAll('.file-checkbox:checked')).map(cb => cb.dataset.fileKey);
+      if (!checked.length) { showToast('Nenhum arquivo selecionado.'); return; }
+      if (!confirm(`Excluir ${checked.length} arquivo(s) da visualização?`)) return;
+      fullFileList = fullFileList.filter(f => !checked.includes(f.key || f.name || ''));
+      const clone = { ...globalResult, files: fullFileList };
+      globalResult = clone;
+      updateUI(clone);
+      showToast(`${checked.length} arquivo(s) removido(s) da visualização.`);
+    }
+
+    function saveScanToHistory(data) {
+      let history = JSON.parse(localStorage.getItem('scanHistory') || '[]');
+      history.unshift({ bucket: data.bucket || '-', provider: data.provider || 'UNIVERSAL', risk_score: data.risk_score || 0, timestamp: new Date().toLocaleString(), data });
+      history = history.slice(0, 30);
+      localStorage.setItem('scanHistory', JSON.stringify(history));
+      loadHistory();
+    }
+
+    function loadHistory() {
+      const history = JSON.parse(localStorage.getItem('scanHistory') || '[]');
+      const list = document.getElementById('history-list');
+      list.innerHTML = '';
+      if (!history.length) {
+        list.innerHTML = `<div class="history-item"><div class="history-name">Nenhum scan realizado</div><div class="history-meta">Os últimos scans aparecem aqui para reload rápido.</div></div>`;
+        return;
+      }
+      history.forEach((item, index) => {
+        const el = document.createElement('div');
+        el.className = 'history-item' + (selectedHistoryIndex === index ? ' selected' : '');
+        el.innerHTML = `
+          <div class="history-top">
+            <div class="history-name">${escapeHtml(item.bucket)}</div>
+            <button class="danger-ghost" onclick="event.stopPropagation();deleteHistoryItem(${index})">Excluir</button>
+          </div>
+          <div class="history-meta">Provider: ${escapeHtml(item.provider)} • Risco: ${item.risk_score}%<br>${escapeHtml(item.timestamp)}</div>`;
+        el.onclick = () => loadHistoryItem(index);
+        list.appendChild(el);
+      });
+    }
+
+    function loadHistoryItem(index) {
+      const history = JSON.parse(localStorage.getItem('scanHistory') || '[]');
+      if (!history[index]) return;
+      selectedHistoryIndex = index;
+      resetFilters();
+      updateUI(history[index].data);
+      loadHistory();
+      showActionButtons();
+    }
+
+    function deleteHistoryItem(index) {
+      const history = JSON.parse(localStorage.getItem('scanHistory') || '[]');
+      if (!history[index]) return;
+      if (!confirm(`Excluir o scan ${history[index].bucket} do histórico?`)) return;
+      history.splice(index, 1);
+      localStorage.setItem('scanHistory', JSON.stringify(history));
+      if (selectedHistoryIndex === index) selectedHistoryIndex = null;
+      else if (selectedHistoryIndex > index) selectedHistoryIndex--;
+      loadHistory();
+    }
+
+    function clearHistory() {
+      if (!confirm('Limpar todo o histórico?')) return;
+      localStorage.removeItem('scanHistory');
+      selectedHistoryIndex = null;
+      loadHistory();
+    }
+
+    function clearRecommendations() {
+      document.getElementById('recommendation-list-sidebar').innerHTML = `<div class="recommendation-item"><span class="rec-priority">INFO</span><div class="rec-text">Recomendações limpas visualmente.</div></div>`;
+    }
+
+    function formatBytes(bytes) {
+      let value = Number(bytes || 0);
+      if (value <= 0) return '0 B';
+      const units = ['B','KB','MB','GB','TB'];
+      let i = 0;
+      while (value >= 1024 && i < units.length - 1) { value /= 1024; i++; }
+      return `${value.toFixed(2)} ${units[i]}`;
+    }
+
+    function escapeHtml(str) {
+      return String(str || '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    }
+
+    function showActionButtons() { document.getElementById('action-buttons').classList.add('active'); }
+
+    function setStatus(text, loading = false) {
+      const el = document.getElementById('report-status');
+      el.style.display = 'block';
+      el.innerHTML = loading ? `<span class="spinner"></span>${text}` : text;
+    }
+
+    async function generateExecutiveReport() {
+      const target = globalResult?.bucket || globalResult?.account || globalResult?.container;
+      if (!globalResult || !target) { showToast('Execute um scan antes de gerar o relatório.'); return; }
+      const clientName = prompt('Nome do cliente', 'Cliente XYZ Ltda');
+      if (!clientName) return;
+      const clientContact = prompt('Email do cliente', 'contato@cliente.com');
+      if (!clientContact) return;
+      setStatus('Gerando relatório executivo...', true);
+      try {
+        const res = await fetch('/generate-report', {
+          method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ scan_data: globalResult, client_name: clientName, client_contact: clientContact, output_format: 'both' })
+        });
+        if (!res.ok) throw new Error(`Erro ${res.status}`);
+        const result = await res.json();
+        setStatus('Relatório gerado com sucesso.');
+        Object.values(result.files || {}).forEach(path => {
+          const filename = String(path).split('/').pop();
+          const a = document.createElement('a');
+          a.href = `/download-report/${filename}`; a.download = filename; a.target = '_blank';
+          document.body.appendChild(a); a.click(); a.remove();
+        });
+        setTimeout(() => { document.getElementById('report-status').style.display = 'none'; }, 3500);
+      } catch (e) {
+        setStatus(`Erro ao gerar relatório: ${e.message}`);
+      }
+    }
+
+    function exportJSON() {
+      if (!globalResult) { showToast('Nenhum scan disponível.'); return; }
+      const blob = new Blob([JSON.stringify(globalResult, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const target = globalResult.bucket || 'scan';
+      const file = `scan_${target}_${new Date().toISOString().replace(/[:.]/g,'-').slice(0,19)}.json`;
+      const a = document.createElement('a'); a.href = url; a.download = file; a.click(); URL.revokeObjectURL(url);
+      setStatus(`JSON exportado: ${file}`); setTimeout(() => { document.getElementById('report-status').style.display = 'none'; }, 2500);
+    }
+
+    function exportCSV() {
+      if (!globalResult || !(globalResult.files || []).length) { showToast('Nenhum arquivo para exportar.'); return; }
+      const rows = [['Arquivo','Tamanho (bytes)','Tamanho formatado','Severidade','Motivo','Container']];
+      globalResult.files.forEach(file => rows.push([
+        file.key || '', Number(file.size || 0), formatBytes(file.size || 0), normalizeSeverity(file.severity), file.reason || '', file.container || '-'
+      ]));
+      const csv = rows.map(r => r.map(v => `"${String(v).replace(/"/g,'""')}"`).join(',')).join('\n');
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const target = globalResult.bucket || 'scan';
+      const file = `scan_${target}_${new Date().toISOString().replace(/[:.]/g,'-').slice(0,19)}.csv`;
+      const a = document.createElement('a'); a.href = url; a.download = file; a.click(); URL.revokeObjectURL(url);
+      setStatus(`CSV exportado: ${file}`); setTimeout(() => { document.getElementById('report-status').style.display = 'none'; }, 2500);
+    }
+
+    async function shareResults() {
+      if (!globalResult) { showToast('Nenhum resultado para compartilhar.'); return; }
+      try {
+        const encoded = btoa(unescape(encodeURIComponent(JSON.stringify(globalResult))));
+        const shareUrl = `${window.location.origin}${window.location.pathname}?share=${encoded}`;
+        if (navigator.clipboard?.writeText) await navigator.clipboard.writeText(shareUrl);
+        else prompt('Copie o link abaixo:', shareUrl);
+        showToast('Link do scan copiado para a área de transferência.');
+      } catch (e) {
+        prompt('Copie o link abaixo:', `${window.location.origin}${window.location.pathname}`);
+      }
+    }
+
+    function loadSharedData() {
+      const params = new URLSearchParams(window.location.search);
+      const shared = params.get('share');
+      if (!shared) return;
+      try {
+        const data = JSON.parse(decodeURIComponent(escape(atob(shared))));
+        updateUI(data);
+        showActionButtons();
+        showToast('Scan compartilhado carregado.');
+      } catch {
+        showToast('Link de compartilhamento inválido.');
+      }
+    }
+
+    window.onload = async () => {
+      await verifyAuthOrRedirect();
+      toggleProviderFields();
+      loadHistory();
+      loadSharedData();
+      const history = JSON.parse(localStorage.getItem('scanHistory') || '[]');
+      if (history.length) showActionButtons();
+    };
+  </script>
+</body>
+</html>

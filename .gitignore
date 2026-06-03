@@ -8,6 +8,7 @@ __pycache__/
 
 # Virtual Environment
 venv/
+venv_*/
 env/
 ENV/
 .venv
@@ -65,5 +66,21 @@ cookies.txt
 
 # Backups de código
 *.bak
-api_with_mfa.py.bak
-auth_mfa.py.bak
+*.bak*
+*.backup
+*.bkp
+*.bkp.*
+*.bk
+backup_before_patch/
+
+# Chaves e segredos
+*.pem
+*.key
+*.crt
+
+# Backups (genérico)
+*.bak
+*.backup
+*.old
+*.tmp
+*~
