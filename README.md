@@ -1,12 +1,13 @@
-# 🛡️ Security Multicloud Storage Scanner
+# 🛡️ Security Multicloud Scanner — Enterprise Edition
 
-Auditoria avançada de segurança para **AWS S3**, **Google Cloud Storage** e **Azure Blob Storage** com autenticação MFA, dashboard web interativo e geração de relatórios executivos.
+Auditoria avançada de segurança para **AWS S3**, **Google Cloud Storage**, **Azure Blob Storage** e **Kubernetes** com autenticação MFA, dashboard web interativo e geração de relatórios executivos.
 
 ---
 
 ## 🚀 Features
 
 - ☁️ **Multicloud:** AWS S3, GCS, Azure Blob Storage
+- ☸️ **Kubernetes:** Scan autenticado de clusters (EKS, GKE, AKS, on-prem)
 - 🔐 **Dual Mode:** Scan público (sem credenciais) + autenticado (com credenciais)
 - 🔑 **Autenticação MFA:** Login com OTP via TOTP (Google Authenticator)
 - 📊 **Risk Scoring:** 0–100 com níveis CRITICAL / HIGH / MEDIUM / LOW
@@ -20,8 +21,8 @@ Auditoria avançada de segurança para **AWS S3**, **Google Cloud Storage** e **
 
 ```bash
 # Clone o repositório
-git clone https://github.com/charles-rocha-code/security-multicloud-scanner.git
-cd security-multicloud-scanner
+git clone https://github.com/charles-rocha-code/s3_auditor_enteprise.git
+cd s3_auditor_enteprise
 
 # Criar ambiente virtual
 python3 -m venv venv
@@ -79,7 +80,8 @@ Este script para a API, faz backup do banco atual, zera os usuários e reinicia 
 | `GET` | `/health` | Health check |
 | `GET` | `/dashboard` | Dashboard web |
 | `GET` | `/scan/{bucket}` | Scan público (200 objetos) |
-| `POST` | `/scan/authenticated` | Scan autenticado (1000 objetos) |
+| `POST` | `/scan/public` | Scan público via body |
+| `POST` | `/scan/authenticated` | Scan autenticado — S3, GCS, Azure, **Kubernetes** |
 | `POST` | `/generate-report` | Gera relatório PDF + DOCX |
 | `GET` | `/download-report/{filename}` | Download do relatório |
 | `GET` | `/reports/list` | Lista relatórios gerados |
@@ -143,6 +145,99 @@ curl -X POST http://localhost:8000/scan/authenticated \
   }'
 ```
 
+### Kubernetes
+
+```bash
+curl -X POST http://localhost:8000/scan/authenticated \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer <seu_token>" \
+  -d '{
+    "bucket": "meu-cluster",
+    "provider": "KUBERNETES",
+    "kubeconfig_path": "/home/user/.kube/config",
+    "context": "meu-contexto",
+    "namespace": "production",
+    "max_objects": 1000
+  }'
+```
+
+> 💡 Para clusters EKS/GKE/AKS, use o kubeconfig gerado pelo provider (ex: `aws eks update-kubeconfig`, `gcloud container clusters get-credentials`).  
+> Para rodar **dentro do cluster**, omita `kubeconfig_path` e defina `"in_cluster": true`.
+
+---
+
+## ☸️ Kubernetes — Checks de Segurança
+
+O auditor `auditor_k8s_authenticated.py` conecta ao cluster via kubeconfig e executa 5 categorias de verificação:
+
+### 1. Workload Security (Pods e Containers)
+
+| Severidade | Check |
+|---|---|
+| `CRITICAL` | Container com `privileged: true` |
+| `HIGH` | `hostNetwork: true` — compartilha rede do nó |
+| `HIGH` | `hostPID: true` — acessa processos do nó |
+| `HIGH` | `hostIPC: true` |
+| `HIGH` | Container rodando como root (`runAsUser: 0` ou sem `runAsNonRoot`) |
+| `MEDIUM` | Container sem `resources.limits` (CPU/memory) |
+
+### 2. RBAC
+
+| Severidade | Check |
+|---|---|
+| `CRITICAL` | `ClusterRole` com `verbs: ["*"]` e `resources: ["*"]` (permissão total) |
+
+### 3. Secrets e ConfigMaps
+
+| Severidade | Check |
+|---|---|
+| `CRITICAL` | `ConfigMap` com chaves sensíveis em plaintext (`password`, `secret`, `token`, `apikey`, `private_key`, etc.) |
+| `MEDIUM` | `Secret` montado como variável de ambiente (vaza em logs) |
+
+### 4. Exposição de Rede
+
+| Severidade | Check |
+|---|---|
+| `MEDIUM` | Service do tipo `LoadBalancer` ou `NodePort` exposto externamente |
+| `HIGH` | Namespace sem `NetworkPolicy` (tráfego pod-a-pod totalmente liberado) |
+
+### 5. Autenticação Anônima no API Server
+
+| Severidade | Check |
+|---|---|
+| `CRITICAL` | `ClusterRoleBinding` para `system:anonymous` ou `system:unauthenticated` |
+
+### Score de Risco Kubernetes
+
+```
+risk_score = min(100, CRITICAL×25 + HIGH×10 + MEDIUM×3 + LOW×1)
+```
+
+### Payload de retorno
+
+```json
+{
+  "provider": "KUBERNETES",
+  "cluster": "1.29",
+  "platform": "linux/amd64",
+  "namespace_filter": "production",
+  "summary": { "namespaces_scanned": 5, "findings_total": 12 },
+  "files": [
+    {
+      "key": "default/Container/nginx/app",
+      "severity": "CRITICAL",
+      "category": "Workload Security",
+      "reason": "Container rodando como privileged",
+      "recommendation": "Remover privileged=true; usar capabilities específicas se necessário."
+    }
+  ],
+  "severity_distribution": { "CRITICAL": 2, "HIGH": 4, "MEDIUM": 6, "LOW": 0 },
+  "risk_score": 72,
+  "recommendations": ["Remover privileged=true...", "Aplicar NetworkPolicy..."],
+  "errors": []
+}
+```
+
 ---
 
 ## 🌐 Scan Público (sem credenciais)
@@ -168,24 +263,30 @@ curl http://localhost:8000/scan/myaccount.blob.core.windows.net
 FastAPI Server (api_with_mfa.py)
 │
 ├── Autenticação MFA
-│   ├── auth_mfa.py          — TOTP + JWT
-│   └── templates/login.html — Tela de login
+│   ├── auth_mfa.py                  — TOTP + JWT
+│   ├── templates/login.html         — Tela de login
+│   ├── templates/forgot_password.html
+│   └── templates/reset_password.html
 │
 ├── Scan Público (200 objetos)
-│   ├── auditor.py                — AWS S3
-│   ├── auditor_gcs.py            — GCS
-│   └── auditor_azure.py          — Azure Blob
+│   ├── auditor.py                   — AWS S3
+│   ├── auditor_gcs.py               — GCS
+│   └── auditor_azure.py             — Azure Blob
 │
 ├── Scan Autenticado (1000 objetos)
 │   ├── auditor_s3_authenticated.py
 │   ├── auditor_gcs_authenticated.py
-│   └── auditor_azure_authenticated.py
+│   ├── auditor_azure_authenticated.py
+│   └── auditor_k8s_authenticated.py — ☸️ Kubernetes
+│
+├── Roteador Universal
+│   └── auditor_universal.py         — Detecta provider pela URL
 │
 ├── Risk Engine
-│   └── engine_risk.py     — Scoring + Compliance
+│   └── engine_risk.py               — Scoring + Compliance
 │
 ├── Relatórios
-│   └── generate_report.py — PDF + DOCX
+│   └── generate_report.py           — PDF + DOCX com gráficos
 │
 └── Dashboard
     └── templates/dashboard.html
@@ -196,26 +297,30 @@ FastAPI Server (api_with_mfa.py)
 ## 🗂️ Estrutura de Arquivos
 
 ```
-security-multicloud-scanner/
-├── api.py                          # Servidor base (sem MFA)
+s3_auditor_enteprise/
 ├── api_with_mfa.py                 # Servidor principal (com MFA) ← usar este
+├── api.py                          # Servidor base (sem MFA)
 ├── auth_mfa.py                     # Módulo de autenticação MFA
+├── auditor_universal.py            # Roteador de providers por URL
 ├── auditor.py                      # Auditor AWS S3 público
 ├── auditor_gcs.py                  # Auditor GCS público
 ├── auditor_azure.py                # Auditor Azure público
 ├── auditor_s3_authenticated.py     # Auditor AWS S3 autenticado
 ├── auditor_gcs_authenticated.py    # Auditor GCS autenticado
 ├── auditor_azure_authenticated.py  # Auditor Azure autenticado
-├── auditor_universal.py            # Auditor universal (CDN/outros)
+├── auditor_k8s_authenticated.py    # ☸️ Auditor Kubernetes autenticado
 ├── engine_risk.py                  # Motor de risco e compliance
 ├── generate_report.py              # Gerador de relatórios PDF/DOCX
 ├── requirements.txt                # Dependências Python
-├── reset_users.sh                  # Script para resetar usuários
-├── install.sh                      # Script de instalação
+├── deploy_mfa.sh                   # Deploy com MFA
+├── reset_users.sh                  # Reset de usuários
+├── install.sh                      # Instalação
 └── templates/
     ├── dashboard.html              # Dashboard principal
     ├── login.html                  # Tela de login MFA
-    └── mfa_setup.html              # Configuração do MFA
+    ├── mfa_setup.html              # Configuração do MFA
+    ├── forgot_password.html        # Recuperação de senha
+    └── reset_password.html         # Reset de senha
 ```
 
 ---
