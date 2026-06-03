@@ -1578,6 +1578,7 @@
                 <option value="s3">AWS S3</option>
                 <option value="gcs">Google Cloud Storage</option>
                 <option value="azure">Azure Blob Storage</option>
+                <option value="k8s">Kubernetes Cluster</option>
               </select>
               <span class="help-text">Selecione o provedor do bucket</span>
             </div>
@@ -1710,6 +1711,75 @@
                   placeholder="growbiz"
                 />
                 <span class="help-text">Nome do container no Azure Blob Storage</span>
+              </div>
+            </div>
+
+            <!-- Campos Kubernetes -->
+            <div id="k8s-fields" style="display: none;">
+              <div class="input-group">
+                <label class="input-label">Kubeconfig YAML *</label>
+                <textarea
+                  id="k8s-kubeconfig"
+                  class="input-field"
+                  rows="10"
+                  placeholder="Cole aqui o conteúdo do seu ~/.kube/config:
+apiVersion: v1
+kind: Config
+clusters:
+- cluster:
+    server: https://...
+    certificate-authority-data: ...
+  name: my-cluster
+contexts:
+- context:
+    cluster: my-cluster
+    user: my-user
+  name: my-context
+current-context: my-context
+users:
+- name: my-user
+  user:
+    token: ..."
+                ></textarea>
+                <span class="help-text">Conteúdo completo do kubeconfig com credenciais para auditoria</span>
+              </div>
+
+              <div class="credential-row">
+                <div class="input-group">
+                  <label class="input-label">Context (Opcional)</label>
+                  <input
+                    id="k8s-context"
+                    type="text"
+                    class="input-field"
+                    placeholder="Use o current-context se vazio"
+                  />
+                  <span class="help-text">Nome do contexto a usar</span>
+                </div>
+
+                <div class="input-group">
+                  <label class="input-label">Namespace (Opcional)</label>
+                  <input
+                    id="k8s-namespace"
+                    type="text"
+                    class="input-field"
+                    placeholder="Todos os namespaces se vazio"
+                  />
+                  <span class="help-text">Limita auditoria a um namespace</span>
+                </div>
+              </div>
+
+              <div style="margin-top: 16px;">
+                <button
+                  class="btn-primary"
+                  onclick="startK8sScanFromButton()"
+                  id="k8s-scan-btn"
+                  style="background: linear-gradient(135deg, #326CE5 0%, #1e4ba8 100%);"
+                >
+                  ☸️ Auditar Cluster Kubernetes
+                </button>
+                <span class="help-text" style="display:block; margin-top:8px;">
+                  Esse botão é dedicado ao scan Kubernetes — independente do toggle Público/Privado acima.
+                </span>
               </div>
             </div>
           </div>
@@ -2092,12 +2162,15 @@ function logout() {
       const awsFields = document.getElementById("aws-fields");
       const gcsFields = document.getElementById("gcs-fields");
       const azureFields = document.getElementById("azure-fields");
-      
+      const k8sFields = document.getElementById("k8s-fields");
+      const bucketInput = document.getElementById("bucket-input");
+
       // Ocultar todos os campos primeiro
       awsFields.style.display = "none";
       gcsFields.style.display = "none";
       azureFields.style.display = "none";
-      
+      if (k8sFields) k8sFields.style.display = "none";
+
       // Mostrar apenas os campos do provider selecionado
       if (provider === "s3") {
         awsFields.style.display = "block";
@@ -2105,6 +2178,17 @@ function logout() {
         gcsFields.style.display = "block";
       } else if (provider === "azure") {
         azureFields.style.display = "block";
+      } else if (provider === "k8s") {
+        if (k8sFields) k8sFields.style.display = "block";
+      }
+
+      // K8s não usa "bucket" — ajusta placeholder
+      if (bucketInput) {
+        if (provider === "k8s") {
+          bucketInput.placeholder = "Identificador do cluster (ex.: prod-cluster) — apenas rótulo";
+        } else {
+          bucketInput.placeholder = "Ex.: my-bucket.s3.amazonaws.com, bucket.storage.googleapis.com, growbiz.blob.core.windows.net";
+        }
       }
     }
 
@@ -2164,12 +2248,17 @@ function logout() {
     function startPrivateScan(bucket) {
       const provider = document.getElementById("provider-select").value;
       const scanBtn = document.getElementById("scan-btn");
-      
-      const providerMap = {        // ← LINHA NOVA
-    "s3":    "AWS_S3",         // ← LINHA NOVA
-    "gcs":   "GCS",            // ← LINHA NOVA
-    "azure": "AZURE_BLOB"      // ← LINHA NOVA
-  };                           // ← LINHA NOVA
+
+      // Branch dedicado para Kubernetes (endpoint diferente)
+      if (provider === "k8s") {
+        return startK8sScan(bucket, scanBtn);
+      }
+
+      const providerMap = {
+    "s3":    "AWS_S3",
+    "gcs":   "GCS",
+    "azure": "AZURE_BLOB"
+  };
 
   let payload = {
     bucket: bucket,
@@ -2262,6 +2351,78 @@ function logout() {
         .catch(err => {
           console.error(err);
           alert("Erro ao conectar com a API /scan/authenticated.");
+        })
+        .finally(() => {
+          scanBtn.disabled = false;
+          scanBtn.textContent = "▶ Iniciar Scan";
+        });
+    }
+
+    // ============================================================
+    // 1.b START SCAN — Kubernetes
+    // ============================================================
+    function startK8sScanFromButton() {
+      // Garante que provider está em k8s (caso usuário clique direto no botão)
+      const sel = document.getElementById("provider-select");
+      if (sel && sel.value !== "k8s") {
+        sel.value = "k8s";
+        toggleProviderFields();
+      }
+      const label = (document.getElementById("bucket-input")?.value || "").trim() || "kubernetes-cluster";
+      const btn = document.getElementById("k8s-scan-btn");
+      return startK8sScan(label, btn);
+    }
+
+    function startK8sScan(label, scanBtn) {
+      const kubeconfig = document.getElementById("k8s-kubeconfig").value.trim();
+      const context = document.getElementById("k8s-context").value.trim();
+      const namespace = document.getElementById("k8s-namespace").value.trim();
+
+      if (!kubeconfig) {
+        alert("Por favor, cole o conteúdo do kubeconfig para auditar o cluster.");
+        return;
+      }
+
+      const payload = {
+        kubeconfig: kubeconfig,
+        context: context || null,
+        namespace: namespace || null,
+        max_resources: 1000,
+      };
+
+      scanBtn.disabled = true;
+      scanBtn.textContent = "☸️ Auditando cluster...";
+
+      resetFilters();
+      animateScanStart();
+
+      const __token = (localStorage.getItem("scanner_token") || localStorage.getItem("token") || "");
+
+      fetch("/scan/k8s", {
+        method: "POST",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+          ...( __token ? { "Authorization": `Bearer ${__token}` } : {} )
+        },
+        body: JSON.stringify(payload)
+      })
+        .then(res => res.json())
+        .then(data => {
+          console.log("K8S SCAN RESULT:", data);
+          if (data.error || data.detail) {
+            alert(data.error || data.detail);
+            return;
+          }
+          // Garante rótulo amigável no header
+          data.bucket = label || data.cluster || "kubernetes-cluster";
+          updateUI(data);
+          saveScanToHistory(data);
+          showActionButtons();
+        })
+        .catch(err => {
+          console.error(err);
+          alert("Erro ao conectar com a API /scan/k8s.");
         })
         .finally(() => {
           scanBtn.disabled = false;
@@ -3388,17 +3549,18 @@ Ou use o console web do provider.`);
       statusText.textContent = 'Gerando relatório executivo...';
 
       try {
+        const __rptToken = (localStorage.getItem('scanner_token') || localStorage.getItem('token') || '').trim();
         const response = await fetch('/generate-report', {
           method: 'POST',
           headers: {
-            'Content-Type': 'application/json'
+            'Content-Type': 'application/json',
+            ...(__rptToken ? { 'Authorization': `Bearer ${__rptToken}` } : {})
           },
-          credentials: 'include', //    
+          credentials: 'include',
           body: JSON.stringify({
-            scan_data: globalResult,
+            scan_result: globalResult,
             client_name: clientName,
-            client_contact: clientContact,
-            output_format: 'both'  // PDF + DOCX
+            output_format: 'both'
           })
         });
 
@@ -3413,9 +3575,11 @@ Ou use o console web do provider.`);
         // Download automático dos arquivos
         setTimeout(() => {
           for (const [format, path] of Object.entries(result.files)) {
+            if (!path) continue;
             const filename = path.split('/').pop();
             const link = document.createElement('a');
-            link.href = `/download-report/${filename}`;
+            // Usa o static mount /reports_executive/ (sem auth) em vez de /download-report/
+            link.href = `/${path}`;
             link.download = filename;
             link.target = '_blank';
             document.body.appendChild(link);

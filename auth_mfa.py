@@ -161,48 +161,54 @@ def create_session_token(email: str) -> str:
 
 # ==================== DEPENDÊNCIAS ====================
 
-def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)) -> Dict[str, Any]:
+def get_current_user(
+    request: Request,
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
+) -> Dict[str, Any]:
     """
-    Middleware para verificar autenticação via Bearer token
-    USADO POR: Endpoints de API REST
+    Aceita Bearer token (Authorization header) OU cookie de sessão.
     """
-    if not credentials:
+    token: Optional[str] = None
+
+    if credentials:
+        token = credentials.credentials
+    else:
+        token = request.cookies.get(COOKIE_NAME)
+
+    if not token:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Token não fornecido"
+            detail="Token não fornecido",
         )
-    
-    token = credentials.credentials
-    
+
     if token not in ACTIVE_SESSIONS:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Token inválido ou expirado"
+            detail="Token inválido ou expirado",
         )
-    
+
     session = ACTIVE_SESSIONS[token]
     email = session["email"]
-    
+
     if email not in USERS_DB:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Usuário não encontrado"
+            detail="Usuário não encontrado",
         )
-    
+
     user = USERS_DB[email]
-    
-    # Verificar se MFA está ativado e foi verificado
+
     if user.get("mfa_enabled") and not session.get("mfa_verified"):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="MFA não verificado"
+            detail="MFA não verificado",
         )
-    
+
     return {
         "email": email,
         "full_name": user.get("full_name"),
         "mfa_enabled": user.get("mfa_enabled", False),
-        "session": session
+        "session": session,
     }
 
 
@@ -264,7 +270,7 @@ def get_current_user_from_cookie(request: Request) -> Dict[str, Any]:
     }
 
 
-def require_mfa(user: Dict[str, Any] = Depends(get_current_user_from_cookie)) -> Dict[str, Any]:
+def require_mfa(user: Dict[str, Any] = Depends(get_current_user)) -> Dict[str, Any]:
     """Requer que MFA esteja ativado"""
     if not user.get("mfa_enabled"):
         raise HTTPException(
@@ -313,7 +319,7 @@ def login_user(email: str, password: str, mfa_code: Optional[str] = None, respon
         )
     
     user = USERS_DB[email]
-    
+
     # Verificar senha
     if not verify_password(password, user["password"]):
         raise HTTPException(
@@ -415,8 +421,13 @@ def login_user(email: str, password: str, mfa_code: Optional[str] = None, respon
     }
 
 
-def setup_mfa(email: str) -> Dict[str, Any]:
-    """Configura MFA para usuário"""
+def setup_mfa(email: str, regenerate: bool = False) -> Dict[str, Any]:
+    """Configura MFA para usuário.
+
+    Se o usuário já tem um secret salvo e MFA ainda não foi ativado,
+    reusa o mesmo secret para evitar invalidar QR já escaneado.
+    Passe regenerate=True para forçar geração de novo secret.
+    """
     if email not in USERS_DB:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -425,27 +436,25 @@ def setup_mfa(email: str) -> Dict[str, Any]:
 
     user = USERS_DB[email]
 
-    # Gerar secret e códigos
-    secret = generate_mfa_secret()
-    backup_codes = generate_backup_codes()
+    existing_secret = user.get("mfa_secret")
+    mfa_enabled = user.get("mfa_enabled", False)
+
+    if existing_secret and not mfa_enabled and not regenerate:
+        secret = existing_secret
+        backup_codes = user.get("backup_codes") or generate_backup_codes()
+        user["backup_codes"] = backup_codes
+    else:
+        secret = generate_mfa_secret()
+        backup_codes = generate_backup_codes()
+        user["mfa_secret"] = secret
+        user["backup_codes"] = backup_codes
+        save_db(USERS_DB_FILE, USERS_DB)
+
     qr_code = generate_qr_code(email, secret)
-
-    # Criar URI de provisionamento
     totp = pyotp.TOTP(secret)
-    provisioning_uri = totp.provisioning_uri(
-        name=email,
-        issuer_name="Security Scanner"
-    )
+    provisioning_uri = totp.provisioning_uri(name=email, issuer_name="Security Scanner")
 
-    # Salvar (mas não ativar ainda)
-    user["mfa_secret"] = secret
-    user["backup_codes"] = backup_codes
-
-    # PERSISTIR MUDANÇAS
-    save_db(USERS_DB_FILE, USERS_DB)
-    print(f"✅ MFA configurado para {email}")
-    print(f"   Secret: {secret}")
-    print(f"   Código atual: {pyotp.TOTP(secret).now()}")
+    print(f"✅ MFA setup retornado para {email}")
 
     return {
         "secret": secret,

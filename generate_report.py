@@ -420,6 +420,7 @@ class ProfessionalReportGenerator:
         'GCS':         'Google Cloud Storage',
         'AZURE':       'Azure Blob Storage',
         'AZURE_BLOB':  'Azure Blob Storage',
+        'KUBERNETES':  'Kubernetes Cluster',
         'UNIVERSAL':   'Multi-Cloud',
     }
 
@@ -445,12 +446,13 @@ class ProfessionalReportGenerator:
         self.timestamp   = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
         self.report_date = datetime.now()
 
-        self.output_dir = Path("./reports_executive")
-        self.output_dir.mkdir(exist_ok=True)
+        base_dir = Path(__file__).resolve().parent
+        self.output_dir = base_dir / "reports_executive"
+        self.output_dir.mkdir(parents=True, exist_ok=True)
 
         # Diretório temporário para gráficos
         self.charts_dir = self.output_dir / "charts_tmp"
-        self.charts_dir.mkdir(exist_ok=True)
+        self.charts_dir.mkdir(parents=True, exist_ok=True)
         self.charts = ChartEngine(self.charts_dir)
 
         self.provider_name = self._get_provider_name()
@@ -586,6 +588,14 @@ class ProfessionalReportGenerator:
                            "Implementar IAM Conditions",
                            "Habilitar 'Object versioning'",
                            "Configurar 'Audit logs'"],
+                'KUBERNETES': ["Remover containers privileged e capabilities desnecessárias",
+                               "Aplicar Pod Security Standards (Restricted) nos namespaces sensíveis",
+                               "Definir resources.limits em todos containers (DoS protection)",
+                               "Implementar NetworkPolicies com default-deny e regras allowlist",
+                               "Migrar Secrets para External Secrets Operator + Vault/KMS",
+                               "Auditar ClusterRoles com '*:*' e aplicar least-privilege",
+                               "Desabilitar --anonymous-auth no kube-apiserver",
+                               "Habilitar audit logging e encryption-at-rest do etcd"],
             }
             if 'AZURE' in prov:
                 actions = ["Revisar IAM no Azure Portal",

@@ -1,13 +1,8 @@
 from __future__ import annotations
 
-import logging
 import os
 import re
 import smtplib
-
-from dotenv import load_dotenv
-
-load_dotenv()
 from email.mime.text import MIMEText
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -26,7 +21,6 @@ from auth_mfa import (  # type: ignore
     ACTIVE_SESSIONS,
     USERS_DB,
     get_current_user,
-    hash_password,
     login_user,
     register_user,
     require_mfa,
@@ -36,37 +30,22 @@ from auth_mfa import (  # type: ignore
 
 # === Auditor autenticado (AWS S3) ===
 from auditor_s3_authenticated import S3AuthenticatedAuditor  # type: ignore
-
-# === Auditor Kubernetes (opcional) ===
-try:
-    from auditor_k8s_authenticated import K8sAuthenticatedAuditor  # type: ignore
-    K8S_AUDITOR_AVAILABLE = True
-except Exception as _e:
-    K8S_AUDITOR_AVAILABLE = False
-    print(f"⚠️ K8s auditor indisponível: {_e}")
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.middleware import SlowAPIMiddleware
 from slowapi.errors import RateLimitExceeded
 
-# === PDF/DOCX Profissional (lazy: matplotlib só carrega ao gerar relatório) ===
-PROFESSIONAL_REPORT: Optional[bool] = None
-_gen_executive_report = None
+# === PDF/DOCX Profissional ===
+try:
+    from generate_report import generate_executive_report as _gen_executive_report
+    PROFESSIONAL_REPORT = True
+    print("✅ Gerador de relatórios profissional carregado")
+except ImportError as e:
+    PROFESSIONAL_REPORT = False
+    print(f"⚠️ generate_report.py não encontrado, usando fallback: {e}")
 
-
-def _ensure_report_loaded() -> bool:
-    """Carrega generate_report sob demanda (matplotlib é pesado no import)."""
-    global PROFESSIONAL_REPORT, _gen_executive_report
-    if PROFESSIONAL_REPORT is not None:
-        return PROFESSIONAL_REPORT
-    try:
-        from generate_report import generate_executive_report as _gen
-        _gen_executive_report = _gen
-        PROFESSIONAL_REPORT = True
-        print("✅ Gerador de relatórios profissional carregado (lazy)")
-    except ImportError as e:
-        PROFESSIONAL_REPORT = False
-        logging.warning("generate_report.py indisponível: %s", e)
-    return PROFESSIONAL_REPORT
+from reportlab.lib.pagesizes import A4
+from reportlab.pdfgen import canvas as rl_canvas
+from docx import Document
 
 
 # -----------------------------------------------------------------------------
@@ -371,7 +350,7 @@ def _send_reset_email(to_email: str, reset_link: str) -> bool:
     """
 
     if not SMTP_HOST or not SMTP_USER or not SMTP_PASS:
-        logging.warning("[RESET PASSWORD] SMTP não configurado; e-mail não enviado.")
+        print(f"[RESET PASSWORD] SMTP não configurado. Link para {to_email}: {reset_link}")
         return False
 
     msg = MIMEText(html_body, "html", "utf-8")
@@ -397,7 +376,7 @@ def _update_user_password(email: str, new_password: str) -> None:
     if not user:
         raise HTTPException(status_code=404, detail="Usuário não encontrado")
 
-    user["password"] = hash_password(new_password)
+    user["password"] = new_password
     user["updated_at"] = datetime.utcnow().isoformat()
 
 
@@ -426,37 +405,24 @@ def ratelimit_test(request: Request):
 
 @app.get("/login", response_class=HTMLResponse, include_in_schema=False)
 def login_page(request: Request):
-    return templates.TemplateResponse(
-        request=request,
-        name="login.html",
-        context={"request": request},
-    )
+    return templates.TemplateResponse("login.html", {"request": request})
 
 
 @app.get("/mfa/setup", response_class=HTMLResponse, include_in_schema=False)
 def mfa_setup_page(request: Request):
-    return templates.TemplateResponse(
-        request=request,
-        name="mfa_setup.html",
-        context={"request": request},
-    )
+    return templates.TemplateResponse("mfa_setup.html", {"request": request})
 
 
 @app.get("/dashboard", response_class=HTMLResponse, include_in_schema=False)
 def dashboard_page(request: Request):
-    return templates.TemplateResponse(
-        request=request,
-        name="dashboard.html",
-        context={"request": request},
-    )
+    return templates.TemplateResponse("dashboard.html", {"request": request})
 
 
 @app.get("/forgot-password", response_class=HTMLResponse, include_in_schema=False)
 def forgot_password_page(request: Request):
     return templates.TemplateResponse(
-        request=request,
-        name="forgot_password.html",
-        context={
+        "forgot_password.html",
+        {
             "request": request,
             "success": False,
             "message": None,
@@ -473,9 +439,8 @@ def reset_password_page(request: Request, email: str, token: str):
         return HTMLResponse("<h2>Link inválido ou expirado.</h2>", status_code=400)
 
     return templates.TemplateResponse(
-        request=request,
-        name="reset_password.html",
-        context={
+        "reset_password.html",
+        {
             "request": request,
             "email": email,
             "token": token,
@@ -507,7 +472,7 @@ def auth_register(data: UserRegisterIn):
 
 
 @app.post("/auth/login")
-@limiter.limit("1/minute")
+@limiter.limit("5/minute")
 def auth_login(request: Request, data: UserLoginIn, response: Response):
     return login_user(email=data.email, password=data.password, mfa_code=data.mfa_code, response=response)
 
@@ -567,19 +532,20 @@ def forgot_password_submit(request: Request, email: str = Form(...)):
     if user:
         token = _create_password_reset_token(normalized_email)
         reset_link = f"{APP_BASE_URL}/reset-password?email={normalized_email}&token={token}"
+
         try:
             _send_reset_email(normalized_email, reset_link)
         except Exception as e:
-            logging.exception("Erro ao enviar e-mail de reset para %s: %s", normalized_email, e)
+            print(f"[RESET LINK]: {reset_link}")
+            print(f"Erro email: {e}")
 
     return templates.TemplateResponse(
-        request=request,
-        name="forgot_password.html",
-        context={
+        "forgot_password.html",
+        {
             "request": request,
             "success": True,
             "message": "Se o e-mail existir em nossa base, um link de recuperação foi enviado.",
-            "reset_link": None,
+            "reset_link": reset_link
         }
     )
 
@@ -596,18 +562,139 @@ def reset_password_submit(
     if not user:
         return HTMLResponse("<h2>Usuário não encontrado</h2>", status_code=404)
 
-    user["password"] = hash_password(new_password)
+    user["password"] = new_password
 
-    return templates.TemplateResponse(
-        request=request,
-        name="reset_password.html",
-        context={
-            "request": request,
-            "success": "Senha alterada com sucesso",
-            "email": email,
-            "token": "",
+    return HTMLResponse("<h2>Senha alterada com sucesso. <a href='/login'>Login</a></h2>")
+
+
+# -----------------------------------------------------------------------------
+# API protegida (MFA obrigatório)
+# -----------------------------------------------------------------------------
+@app.get("/api/dashboard")
+def dashboard_api(user=Depends(require_mfa)):
+    return {"ok": True, "user": user}
+
+
+@app.get("/api/me")
+def api_me(user=Depends(get_current_user)):
+    return {"ok": True, "user": user}
+
+
+# -----------------------------------------------------------------------------
+# Scan público
+# -----------------------------------------------------------------------------
+@app.get("/scan/{target:path}")
+def scan_public_compat(target: str, user=Depends(require_mfa)):
+    from auditor_universal import UniversalAuditor
+    auditor = UniversalAuditor(target=target, max_objects=1000)
+    result = auditor.run()
+    result = _normalize_scan_result(result, provider=result.get("provider", "UNIVERSAL"), target=target)
+    email = user.get("email") if isinstance(user, dict) else None
+    if email:
+        LAST_SCAN_BY_EMAIL[email] = result
+    return result
+
+
+@app.post("/scan/public")
+def scan_public(payload: PublicScanIn, user=Depends(require_mfa)):
+    from auditor_universal import UniversalAuditor
+    auditor = UniversalAuditor(target=payload.target, max_objects=payload.max_objects)
+    result = auditor.run()
+    result = _normalize_scan_result(result, provider=result.get("provider", "UNIVERSAL"), target=payload.target)
+    email = user.get("email") if isinstance(user, dict) else None
+    if email:
+        LAST_SCAN_BY_EMAIL[email] = result
+    return result
+
+
+@app.post("/scan/authenticated")
+def scan_authenticated(payload: AuthenticatedScanIn, user=Depends(require_mfa)):
+    from auditor_s3_authenticated import S3AuthenticatedAuditor
+    provider = (payload.provider or "AWS_S3").upper()
+    region_name = payload.region_name or payload.region
+
+    if provider == "GCS":
+        from auditor_gcs_authenticated import GCSAuthenticatedAuditor
+        if not payload.service_account_key:
+            raise HTTPException(status_code=400, detail="Credencial GCS ausente.")
+        auditor = GCSAuthenticatedAuditor(
+            bucket_name=payload.bucket,
+            service_account_key=payload.service_account_key,
+            max_objects=payload.max_objects,
+        )
+    elif provider == "AWS_S3":
+        if not payload.aws_access_key_id or not payload.aws_secret_access_key:
+            raise HTTPException(status_code=400, detail="Credenciais AWS ausentes.")
+        auditor = S3AuthenticatedAuditor(
+            bucket_name=payload.bucket,
+            aws_access_key_id=payload.aws_access_key_id,
+            aws_secret_access_key=payload.aws_secret_access_key,
+            aws_session_token=payload.aws_session_token,
+            region_name=region_name,
+            max_objects=payload.max_objects,
+        )
+    else:
+        raise HTTPException(status_code=400, detail=f"Provider '{provider}' não suportado.")
+
+    result = auditor.run()
+    result = _normalize_scan_result(result, provider=provider, target=payload.bucket)
+    email = user.get("email") if isinstance(user, dict) else None
+    if email:
+        LAST_SCAN_BY_EMAIL[email] = result
+    return result
+
+
+@app.post("/generate-report")
+def generate_report(data: GenerateReportIn, user=Depends(require_mfa)):
+    scan = data.scan_result or {}
+    email = user.get("email") if isinstance(user, dict) else None
+    cached = LAST_SCAN_BY_EMAIL.get(email) if email else None
+    if cached and not scan.get("files"):
+        scan = cached
+    if not scan:
+        raise HTTPException(status_code=400, detail="Nenhum scan disponível. Execute um scan antes.")
+    provider = scan.get("provider") or _detect_provider(str(scan.get("bucket", "")))
+    target = str(scan.get("bucket") or "-")
+    scan = _normalize_scan_result(scan, provider=provider, target=target)
+
+    if PROFESSIONAL_REPORT:
+        try:
+            client_info = {"name": data.client_name or "Cliente", "contact": email or "-"}
+            results = _gen_executive_report(scan, client_info=client_info, output_format="both")
+            pdf_file = Path(results.get("pdf", ""))
+            docx_file = Path(results.get("docx", ""))
+            return {
+                "success": True,
+                "files": {
+                    "pdf": f"reports_executive/{pdf_file.name}" if pdf_file.exists() else None,
+                    "docx": f"reports_executive/{docx_file.name}" if docx_file.exists() else None,
+                },
+                "message": "Relatórios profissionais gerados com sucesso",
+            }
+        except Exception as e:
+            import traceback; traceback.print_exc()
+            raise HTTPException(status_code=500, detail=f"Erro no gerador profissional: {e}")
+
+    pdf_path = _make_pdf(scan, data.report_title, data.client_name)
+    docx_path = _make_docx(scan, data.report_title, data.client_name)
+    return {
+        "success": True,
+        "files": {
+            "pdf": f"reports_executive/{pdf_path.name}",
+            "docx": f"reports_executive/{docx_path.name}",
         },
-    )
+        "message": "Relatórios gerados com sucesso",
+    }
+
+
+@app.get("/download-report/{filename}")
+def download_report(filename: str, user=Depends(require_mfa)):
+    safe = _safe_filename(filename)
+    path = REPORTS_DIR / safe
+    if not path.exists():
+        raise HTTPException(status_code=404, detail="Relatório não encontrado")
+    media = "application/pdf" if safe.lower().endswith(".pdf") else "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+    return FileResponse(str(path), media_type=media, filename=safe)
 
 
 # ---------------- MFA SETUP AUTO ----------------
@@ -634,142 +721,4 @@ def auth_mfa_setup(data: MFASetupIn):
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 # ------------------------------------------------
-
-
-@app.get("/api/dashboard")
-def dashboard_api(user=Depends(require_mfa)):
-    return {
-        "ok": True,
-        "user": user
-    }
-
-
-# ================= GERAÇÃO DE RELATÓRIO =================
-
-class GenerateReportIn(BaseModel):
-    scan_data: Dict[str, Any]
-    client_name: Optional[str] = None
-    client_contact: Optional[str] = None
-    output_format: str = "both"  # "pdf" | "docx" | "both"
-
-
-@app.post("/generate-report")
-def generate_report_endpoint(data: GenerateReportIn, user=Depends(require_mfa)):
-    """Gera relatório PDF/DOCX executivo a partir do scan_data."""
-    if not _ensure_report_loaded():
-        raise HTTPException(status_code=503, detail="Gerador de relatório indisponível.")
-
-    client_info = None
-    if data.client_name or data.client_contact:
-        client_info = {"name": data.client_name or "", "contact": data.client_contact or ""}
-
-    try:
-        results = _gen_executive_report(
-            scan_data=data.scan_data,
-            client_info=client_info,
-            output_format=data.output_format,
-        )
-    except Exception as e:
-        logging.exception("Erro ao gerar relatório: %s", e)
-        raise HTTPException(status_code=500, detail=f"Erro ao gerar relatório: {e}")
-
-    files: Dict[str, str] = {}
-    for fmt in ("pdf", "docx"):
-        path = results.get(fmt)
-        if path:
-            files[fmt] = str(path)
-
-    if not files:
-        raise HTTPException(status_code=500, detail="Nenhum arquivo gerado.")
-
-    return {"ok": True, "files": files}
-
-
-@app.get("/download-report/{filename}")
-def download_report(filename: str, user=Depends(require_mfa)):
-    """Baixa um relatório gerado em reports_executive/."""
-    safe = Path(filename).name  # bloqueia path traversal
-    target = REPORTS_DIR / safe
-    if not target.exists() or not target.is_file():
-        raise HTTPException(status_code=404, detail="Relatório não encontrado.")
-    return FileResponse(path=str(target), filename=safe)
-
-
-# ================= KUBERNETES SCAN =================
-
-class K8sScanIn(BaseModel):
-    kubeconfig: str = Field(..., description="Conteúdo YAML do kubeconfig")
-    context: Optional[str] = None
-    namespace: Optional[str] = None
-    max_resources: int = 1000
-
-
-@app.post("/scan/k8s")
-def scan_k8s(data: K8sScanIn, user=Depends(require_mfa)):
-    """Audita cluster Kubernetes a partir de kubeconfig fornecido."""
-    if not K8S_AUDITOR_AVAILABLE:
-        raise HTTPException(
-            status_code=503,
-            detail="Auditor Kubernetes indisponível. Instale: pip install kubernetes>=29.0.0",
-        )
-
-    import tempfile
-    tmp = tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False)
-    try:
-        tmp.write(data.kubeconfig)
-        tmp.flush()
-        tmp.close()
-
-        auditor = K8sAuthenticatedAuditor(
-            kubeconfig_path=tmp.name,
-            context=data.context,
-            namespace=data.namespace,
-            max_resources=data.max_resources,
-        )
-        result = auditor.run()
-        return result
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-    except Exception as e:
-        logging.exception("Erro no scan k8s: %s", e)
-        raise HTTPException(status_code=500, detail=f"Erro no scan: {e}")
-    finally:
-        try:
-            os.unlink(tmp.name)
-        except Exception:
-            pass
-
-
-# ================= RESET PASSWORD =================
-
-class ResetPasswordIn(BaseModel):
-    email: str
-    token: str
-    new_password: str
-
-def reset_password(data: ResetPasswordIn):
-    email = data.email.lower().strip()
-    token = data.token
-    new_password = data.new_password
-
-    user = USERS_DB.get(email)
-    if not user:
-        raise HTTPException(status_code=404, detail="Usuário não encontrado")
-
-    # valida token
-    if user.get("reset_token") != token:
-        raise HTTPException(status_code=401, detail="Token inválido")
-
-    # atualiza senha
-    user["password"] = hash_password(new_password)
-
-    # invalida token
-    user["reset_token"] = None
-
-    return {"success": True, "message": "Senha atualizada com sucesso"}
-
-# ==================================================
-
-
-
 

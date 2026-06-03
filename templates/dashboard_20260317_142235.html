@@ -2017,6 +2017,7 @@ function logout() {
       try {
         const res = await fetch("/api/dashboard", {
           method: "GET",
+          credentials: "include",
           headers: { "Authorization": `Bearer ${token}` }
         });
 
@@ -2164,10 +2165,17 @@ function logout() {
       const provider = document.getElementById("provider-select").value;
       const scanBtn = document.getElementById("scan-btn");
       
-      let payload = {
-        bucket: bucket,
-        max_objects: 1000
-      };
+      const providerMap = {        // ← LINHA NOVA
+    "s3":    "AWS_S3",         // ← LINHA NOVA
+    "gcs":   "GCS",            // ← LINHA NOVA
+    "azure": "AZURE_BLOB"      // ← LINHA NOVA
+  };                           // ← LINHA NOVA
+
+  let payload = {
+    bucket: bucket,
+    provider: providerMap[provider] || provider.toUpperCase(),  // ← LINHA NOVA
+    max_objects: 1000
+  };
 
       // Validação e montagem do payload por provider
       if (provider === "s3") {
@@ -2231,6 +2239,7 @@ function logout() {
 
       fetch("/scan/authenticated", {
         method: "POST",
+        credentials: "include",
         headers: {
           "Content-Type": "application/json",
           ...( __token ? { "Authorization": `Bearer ${__token}` } : {} )
@@ -3384,6 +3393,7 @@ Ou use o console web do provider.`);
           headers: {
             'Content-Type': 'application/json'
           },
+          credentials: 'include', //    
           body: JSON.stringify({
             scan_data: globalResult,
             client_name: clientName,
@@ -3722,6 +3732,12 @@ Ou use o console web do provider.`);
       await verifyAuthOrRedirect();
       loadHistory();
       loadSharedData(); // Carregar dados compartilhados se houver
+
+      // Reexibir barra de exportar se já houver scan no histórico
+      const scanHistory = JSON.parse(localStorage.getItem("scanHistory") || "[]");
+      if (scanHistory.length > 0) {
+        showActionButtons();
+      }
     };
 
   </script>
