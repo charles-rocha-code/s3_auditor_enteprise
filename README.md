@@ -257,17 +257,17 @@ curl http://localhost:8000/scan/myaccount.blob.core.windows.net
 
 ---
 
-## 🏗️ Infraestrutura AWS
+## 🏗️ Arquitetura
+
+### Aplicação
+
+![Arquitetura da Aplicação — Security Multicloud Scanner](docs/app-architecture.png)
+
+### Infraestrutura AWS
 
 ![Infraestrutura AWS — Security Multicloud Scanner (HA)](docs/aws-architecture.png)
 
-> Arquitetura de alta disponibilidade em `us-east-2` com WAF v2, ALB, Auto Scaling Group (2–4 EC2), TLS 1.3 via ACM e provisionamento por Terraform IaC.
-
----
-
-## 🎯 Arquitetura da Aplicação
-
-![Arquitetura da Aplicação — Security Multicloud Scanner](docs/app-architecture.png)
+> Alta disponibilidade em `us-east-2` · WAF v2 · ALB · Auto Scaling Group (2–4 EC2) · TLS 1.3 via ACM · Terraform IaC
 
 ```
 FastAPI Server (api_with_mfa.py)
