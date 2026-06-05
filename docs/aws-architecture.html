@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Arquitetura AWS - Security Scanner HA</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{background:#0d1117;color:#e6edf3;font-family:'DM Sans',sans-serif;min-height:100vh}
+body{padding:2rem 2rem 3rem;max-width:1100px;margin:0 auto}
+.top{display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:1.5rem;padding-bottom:1rem;border-bottom:1px solid rgba(255,255,255,.07);gap:.5rem;flex-wrap:wrap}
+.top-title{font-size:1.1rem;font-weight:500;letter-spacing:-.01em}
+.top-sub{font-size:.72rem;color:#6e7681;margin-top:3px;font-family:'DM Mono',monospace}
+.tags{display:flex;gap:.4rem;flex-wrap:wrap}
+.tag{border:1px solid;border-radius:20px;padding:2px 9px;font-size:.67rem;font-family:'DM Mono',monospace;white-space:nowrap}
+.tg{background:rgba(63,185,80,.08);color:#3fb950;border-color:rgba(63,185,80,.22)}
+.tb{background:rgba(88,166,255,.08);color:#58a6ff;border-color:rgba(88,166,255,.22)}
+.tr{background:rgba(248,81,73,.08);color:#f85149;border-color:rgba(248,81,73,.22)}
+.ta{background:rgba(227,179,65,.08);color:#e3b341;border-color:rgba(227,179,65,.22)}
+.tp{background:rgba(163,113,247,.08);color:#a371f7;border-color:rgba(163,113,247,.22)}
+@keyframes dot{0%,100%{opacity:1}50%{opacity:.3}}
+.dot{display:inline-block;width:5px;height:5px;border-radius:50%;background:currentColor;animation:dot 2s infinite}
+.diagram{background:#161b22;border:1px solid rgba(255,255,255,.07);border-radius:12px;padding:1.5rem;overflow-x:auto}
+.diagram svg{display:block;min-width:960px}
+.stats{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-top:1rem}
+.stat{background:#161b22;border:1px solid rgba(255,255,255,.06);border-radius:8px;padding:.55rem .9rem}
+.sn{font-size:1.1rem;font-weight:500}
+.sl{font-size:.65rem;color:#6e7681;font-family:'DM Mono',monospace;text-transform:uppercase;letter-spacing:.04em;margin-top:2px}
+</style>
+</head>
+<body>
+<div class="top">
+  <div>
+    <div class="top-title">Security Multicloud Scanner — Infraestrutura AWS (HA)</div>
+    <div class="top-sub">us-east-2 · Terraform IaC · scanner.oisolucoes.app.br</div>
+  </div>
+  <div class="tags">
+    <span class="tag tg"><span class="dot"></span> operacional</span>
+    <span class="tag tr">WAF v2</span>
+    <span class="tag ta">ASG 2–4</span>
+    <span class="tag tb">TLS 1.3</span>
+    <span class="tag tp">Terraform</span>
+  </div>
+</div>
+<div class="diagram">
+<svg viewBox="0 0 960 680" xmlns="http://www.w3.org/2000/svg" font-family="'DM Sans',sans-serif">
+<defs>
+  <marker id="a" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse">
+    <path d="M2 1L8 5L2 9" fill="none" stroke="context-stroke" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+  </marker>
+</defs>
+<rect x="166" y="10" width="162" height="48" rx="8" fill="rgba(139,148,158,.1)" stroke="rgba(139,148,158,.25)" stroke-width=".7"/>
+<text x="247" y="29" text-anchor="middle" font-size="13" font-weight="500" fill="#e6edf3">Internet</text>
+<text x="247" y="47" text-anchor="middle" font-size="10" fill="#8b949e" font-family="'DM Mono',monospace">scanner.oisolucoes.app.br</text>
+<rect x="368" y="10" width="178" height="48" rx="8" fill="rgba(227,179,65,.08)" stroke="rgba(227,179,65,.25)" stroke-width=".7"/>
+<text x="457" y="29" text-anchor="middle" font-size="13" font-weight="500" fill="#e3b341">GitHub Actions</text>
+<text x="457" y="47" text-anchor="middle" font-size="10" fill="#8b949e" font-family="'DM Mono',monospace">push main → auto-deploy</text>
+<rect x="8" y="72" width="602" height="556" rx="12" fill="none" stroke="rgba(255,255,255,.05)" stroke-dasharray="8 5" stroke-width="1"/>
+<text x="602" y="87" text-anchor="end" font-size="9" fill="rgba(255,255,255,.2)" font-family="'DM Mono',monospace">AWS · us-east-2</text>
+<rect x="20" y="90" width="130" height="42" rx="6" fill="rgba(139,148,158,.07)" stroke="rgba(139,148,158,.2)" stroke-width=".6"/>
+<text x="85" y="108" text-anchor="middle" font-size="11.5" font-weight="500" fill="#e6edf3">Route 53</text>
+<text x="85" y="124" text-anchor="middle" font-size="9.5" fill="#8b949e" font-family="'DM Mono',monospace">DNS Alias → ALB</text>
+<rect x="164" y="90" width="130" height="42" rx="6" fill="rgba(227,179,65,.06)" stroke="rgba(227,179,65,.2)" stroke-width=".6"/>
+<text x="229" y="108" text-anchor="middle" font-size="11.5" font-weight="500" fill="#e3b341">ACM · TLS 1.3</text>
+<text x="229" y="124" text-anchor="middle" font-size="9.5" fill="rgba(227,179,65,.65)" font-family="'DM Mono',monospace">certificate → ALB</text>
+<rect x="20" y="146" width="580" height="52" rx="7" fill="rgba(248,81,73,.07)" stroke="rgba(248,81,73,.28)" stroke-width="1"/>
+<text x="310" y="165" text-anchor="middle" font-size="13" font-weight="500" fill="#f85149">AWS WAF v2</text>
+<text x="310" y="183" text-anchor="middle" font-size="10.5" fill="rgba(248,81,73,.7)" font-family="'DM Mono',monospace">17 regras · OWASP · rate-limiting · SQLi · path traversal · attack tools · IP reputation</text>
+<rect x="14" y="212" width="596" height="454" rx="10" fill="none" stroke="rgba(255,255,255,.04)" stroke-dasharray="5 3" stroke-width=".8"/>
+<text x="602" y="226" text-anchor="end" font-size="9" fill="rgba(255,255,255,.15)" font-family="'DM Mono',monospace">VPC · 10.0.0.0/16</text>
+<rect x="26" y="230" width="572" height="92" rx="8" fill="rgba(88,166,255,.05)" stroke="rgba(88,166,255,.18)" stroke-width=".6"/>
+<text x="590" y="243" text-anchor="end" font-size="9" fill="rgba(88,166,255,.45)">Public subnets · AZ-a 10.0.1.0/24 · AZ-b 10.0.2.0/24</text>
+<rect x="36" y="244" width="550" height="66" rx="6" fill="rgba(88,166,255,.12)" stroke="rgba(88,166,255,.38)" stroke-width="1"/>
+<text x="311" y="267" text-anchor="middle" font-size="13" font-weight="500" fill="#58a6ff">Application Load Balancer</text>
+<text x="311" y="284" text-anchor="middle" font-size="10.5" fill="rgba(88,166,255,.7)" font-family="'DM Mono',monospace">security-scanner-alb · HTTPS :443 · deletion-protection=on · /health</text>
+<text x="311" y="300" text-anchor="middle" font-size="9.5" fill="rgba(88,166,255,.5)" font-family="'DM Mono',monospace">HTTP :80 → HTTPS redirect</text>
+<rect x="26" y="336" width="272" height="250" rx="9" fill="rgba(57,211,83,.03)" stroke="rgba(57,211,83,.15)" stroke-width=".6"/>
+<text x="162" y="578" text-anchor="middle" font-size="9" fill="rgba(57,211,83,.5)" font-family="'DM Mono',monospace">AZ-a · 10.0.10.0/24</text>
+<rect x="38" y="354" width="248" height="108" rx="7" fill="rgba(163,113,247,.1)" stroke="rgba(163,113,247,.28)" stroke-width=".7"/>
+<text x="162" y="376" text-anchor="middle" font-size="12" font-weight="500" fill="#a371f7">EC2 Instance</text>
+<text x="162" y="393" text-anchor="middle" font-size="10" fill="rgba(163,113,247,.65)" font-family="'DM Mono',monospace">Ubuntu 22.04 · t3.micro · 20GB</text>
+<text x="162" y="408" text-anchor="middle" font-size="10" fill="#8b949e">uvicorn · :8000 · IAM Role</text>
+<text x="162" y="424" text-anchor="middle" font-size="10" fill="#8b949e">Python 3.11 · Docker</text>
+<text x="162" y="442" text-anchor="middle" font-size="10" fill="#3fb950" font-weight="500">● healthy</text>
+<rect x="38" y="472" width="116" height="34" rx="5" fill="rgba(63,185,80,.07)" stroke="rgba(63,185,80,.2)" stroke-width=".6"/>
+<text x="96" y="487" text-anchor="middle" font-size="10" fill="#3fb950" font-weight="500">NAT Gateway A</text>
+<text x="96" y="499" text-anchor="middle" font-size="9" fill="rgba(63,185,80,.55)" font-family="'DM Mono',monospace">us-east-2a</text>
+<rect x="166" y="472" width="120" height="34" rx="5" fill="rgba(139,148,158,.06)" stroke="rgba(139,148,158,.15)" stroke-width=".6"/>
+<text x="226" y="487" text-anchor="middle" font-size="10" fill="#8b949e" font-weight="500">Internet GW</text>
+<text x="226" y="499" text-anchor="middle" font-size="9" fill="#6e7681" font-family="'DM Mono',monospace">outbound</text>
+<rect x="320" y="336" width="272" height="250" rx="9" fill="rgba(57,211,83,.03)" stroke="rgba(57,211,83,.15)" stroke-width=".6"/>
+<text x="456" y="578" text-anchor="middle" font-size="9" fill="rgba(57,211,83,.5)" font-family="'DM Mono',monospace">AZ-b · 10.0.20.0/24</text>
+<rect x="332" y="354" width="248" height="108" rx="7" fill="rgba(163,113,247,.1)" stroke="rgba(163,113,247,.28)" stroke-width=".7"/>
+<text x="456" y="376" text-anchor="middle" font-size="12" font-weight="500" fill="#a371f7">EC2 Instance</text>
+<text x="456" y="393" text-anchor="middle" font-size="10" fill="rgba(163,113,247,.65)" font-family="'DM Mono',monospace">Ubuntu 22.04 · t3.micro · 20GB</text>
+<text x="456" y="408" text-anchor="middle" font-size="10" fill="#8b949e">uvicorn · :8000 · IAM Role</text>
+<text x="456" y="424" text-anchor="middle" font-size="10" fill="#8b949e">Python 3.11 · Docker</text>
+<text x="456" y="442" text-anchor="middle" font-size="10" fill="#3fb950" font-weight="500">● healthy</text>
+<rect x="332" y="472" width="116" height="34" rx="5" fill="rgba(63,185,80,.07)" stroke="rgba(63,185,80,.2)" stroke-width=".6"/>
+<text x="390" y="487" text-anchor="middle" font-size="10" fill="#3fb950" font-weight="500">NAT Gateway B</text>
+<text x="390" y="499" text-anchor="middle" font-size="9" fill="rgba(63,185,80,.55)" font-family="'DM Mono',monospace">us-east-2b</text>
+<rect x="460" y="472" width="126" height="34" rx="5" fill="rgba(88,166,255,.07)" stroke="rgba(88,166,255,.18)" stroke-width=".6"/>
+<text x="523" y="487" text-anchor="middle" font-size="10" fill="#58a6ff" font-weight="500">EBS Snapshots</text>
+<text x="523" y="499" text-anchor="middle" font-size="9" fill="rgba(88,166,255,.55)" font-family="'DM Mono',monospace">7 dias retenção</text>
+<rect x="26" y="594" width="572" height="62" rx="7" fill="rgba(227,179,65,.06)" stroke="rgba(227,179,65,.22)" stroke-dasharray="4 2" stroke-width=".9"/>
+<text x="312" y="612" text-anchor="middle" font-size="12" font-weight="500" fill="#e3b341">Auto Scaling Group · security-scanner-asg</text>
+<text x="312" y="630" text-anchor="middle" font-size="10" fill="rgba(227,179,65,.7)" font-family="'DM Mono',monospace">min: 2  ·  max: 4  ·  desired: 2  ·  grace-period: 180s</text>
+<text x="312" y="647" text-anchor="middle" font-size="10" fill="rgba(227,179,65,.55)" font-family="'DM Mono',monospace">Target Tracking · CPU 70%  ·  Launch Template: Ubuntu 22.04 · t3.micro</text>
+<text x="648" y="90" font-size="9" fill="rgba(255,255,255,.25)" font-family="'DM Mono',monospace" font-weight="500">MONITORAMENTO</text>
+<rect x="648" y="100" width="144" height="52" rx="6" fill="rgba(88,166,255,.08)" stroke="rgba(88,166,255,.22)" stroke-width=".7"/>
+<text x="720" y="118" text-anchor="middle" font-size="11.5" font-weight="500" fill="#58a6ff">CloudWatch Logs</text>
+<text x="720" y="134" text-anchor="middle" font-size="9.5" fill="rgba(88,166,255,.6)" font-family="'DM Mono',monospace">App + WAF logs</text>
+<text x="720" y="146" text-anchor="middle" font-size="9" fill="#6e7681" font-family="'DM Mono',monospace">aws-waf-logs-*</text>
+<rect x="804" y="100" width="144" height="52" rx="6" fill="rgba(88,166,255,.08)" stroke="rgba(88,166,255,.22)" stroke-width=".7"/>
+<text x="876" y="118" text-anchor="middle" font-size="11.5" font-weight="500" fill="#58a6ff">CW Alarms</text>
+<text x="876" y="134" text-anchor="middle" font-size="9.5" fill="rgba(88,166,255,.6)" font-family="'DM Mono',monospace">CPU · unhealthy hosts</text>
+<text x="876" y="146" text-anchor="middle" font-size="9" fill="#6e7681" font-family="'DM Mono',monospace">WAF: 5 alarmes</text>
+<rect x="648" y="164" width="300" height="42" rx="6" fill="rgba(88,166,255,.05)" stroke="rgba(88,166,255,.16)" stroke-width=".6"/>
+<text x="798" y="180" text-anchor="middle" font-size="11.5" font-weight="500" fill="#58a6ff">CloudWatch Dashboard</text>
+<text x="798" y="197" text-anchor="middle" font-size="9.5" fill="rgba(88,166,255,.5)" font-family="'DM Mono',monospace">Métricas WAF · ALB · EC2 · ASG</text>
+<rect x="648" y="218" width="300" height="42" rx="6" fill="rgba(248,81,73,.07)" stroke="rgba(248,81,73,.2)" stroke-width=".7"/>
+<text x="798" y="234" text-anchor="middle" font-size="11.5" font-weight="500" fill="#f85149">SNS Topic · scanner-alerts</text>
+<text x="798" y="251" text-anchor="middle" font-size="9.5" fill="rgba(248,81,73,.6)" font-family="'DM Mono',monospace">CPU alto · WAF blocks · rate-limits → e-mail</text>
+<text x="648" y="280" font-size="9" fill="rgba(255,255,255,.25)" font-family="'DM Mono',monospace" font-weight="500">SEGURANÇA &amp; ACESSO</text>
+<rect x="648" y="290" width="144" height="52" rx="6" fill="rgba(227,179,65,.07)" stroke="rgba(227,179,65,.2)" stroke-width=".7"/>
+<text x="720" y="308" text-anchor="middle" font-size="11.5" font-weight="500" fill="#e3b341">IAM Role</text>
+<text x="720" y="324" text-anchor="middle" font-size="9.5" fill="rgba(227,179,65,.6)" font-family="'DM Mono',monospace">scanner-role</text>
+<text x="720" y="336" text-anchor="middle" font-size="9" fill="#6e7681" font-family="'DM Mono',monospace">SSMCore · instance profile</text>
+<rect x="804" y="290" width="144" height="52" rx="6" fill="rgba(63,185,80,.07)" stroke="rgba(63,185,80,.2)" stroke-width=".7"/>
+<text x="876" y="308" text-anchor="middle" font-size="11.5" font-weight="500" fill="#3fb950">SSM Session Mgr</text>
+<text x="876" y="324" text-anchor="middle" font-size="9.5" fill="rgba(63,185,80,.6)" font-family="'DM Mono',monospace">sem porta 22</text>
+<text x="876" y="336" text-anchor="middle" font-size="9" fill="#6e7681" font-family="'DM Mono',monospace">acesso via IAM Role</text>
+<rect x="648" y="354" width="300" height="52" rx="6" fill="rgba(248,81,73,.06)" stroke="rgba(248,81,73,.18)" stroke-width=".6"/>
+<text x="798" y="372" text-anchor="middle" font-size="11.5" font-weight="500" fill="#f85149">Security Groups</text>
+<text x="798" y="388" text-anchor="middle" font-size="9.5" fill="rgba(248,81,73,.6)" font-family="'DM Mono',monospace">ALB-sg: :443/:80 → 0.0.0.0/0</text>
+<text x="798" y="400" text-anchor="middle" font-size="9.5" fill="rgba(248,81,73,.5)" font-family="'DM Mono',monospace">EC2-sg: :8000 → ALB-sg only</text>
+<text x="648" y="428" font-size="9" fill="rgba(255,255,255,.25)" font-family="'DM Mono',monospace" font-weight="500">INFRAESTRUTURA</text>
+<rect x="648" y="438" width="144" height="52" rx="6" fill="rgba(163,113,247,.07)" stroke="rgba(163,113,247,.2)" stroke-width=".7"/>
+<text x="720" y="456" text-anchor="middle" font-size="11.5" font-weight="500" fill="#a371f7">Terraform IaC</text>
+<text x="720" y="472" text-anchor="middle" font-size="9.5" fill="rgba(163,113,247,.6)" font-family="'DM Mono',monospace">≥ 1.5 · AWS ~5.0</text>
+<text x="720" y="484" text-anchor="middle" font-size="9" fill="#6e7681" font-family="'DM Mono',monospace">profile=scanner</text>
+<rect x="804" y="438" width="144" height="52" rx="6" fill="rgba(227,179,65,.06)" stroke="rgba(227,179,65,.18)" stroke-width=".6"/>
+<text x="876" y="456" text-anchor="middle" font-size="11.5" font-weight="500" fill="#e3b341">ACM · TLS 1.3</text>
+<text x="876" y="472" text-anchor="middle" font-size="9.5" fill="rgba(227,179,65,.6)" font-family="'DM Mono',monospace">ELBSecPolicy-2021-06</text>
+<text x="876" y="484" text-anchor="middle" font-size="9" fill="#6e7681" font-family="'DM Mono',monospace">cert: us-east-2</text>
+<rect x="648" y="502" width="300" height="42" rx="6" fill="rgba(139,148,158,.06)" stroke="rgba(139,148,158,.15)" stroke-width=".6"/>
+<text x="798" y="518" text-anchor="middle" font-size="11.5" font-weight="500" fill="#8b949e">Route 53 · evaluate_target_health=true</text>
+<text x="798" y="535" text-anchor="middle" font-size="9.5" fill="#6e7681" font-family="'DM Mono',monospace">Alias A record → ALB · create_subdomain=true</text>
+<line x1="247" y1="58" x2="247" y2="146" stroke="#378ADD" stroke-width="1.6" fill="none" marker-end="url(#a)"/>
+<line x1="247" y1="198" x2="247" y2="244" stroke="#378ADD" stroke-width="1.6" fill="none" marker-end="url(#a)"/>
+<text x="220" y="224" font-size="9.5" fill="#f85149" font-family="'DM Mono',monospace">filtrado</text>
+<path d="M85 132 L85 238 L36 238" fill="none" stroke="rgba(139,148,158,.35)" stroke-width="1" stroke-dasharray="4 3" marker-end="url(#a)"/>
+<path d="M229 132 L229 238 L586 238" fill="none" stroke="rgba(227,179,65,.3)" stroke-width="1" stroke-dasharray="4 3" marker-end="url(#a)"/>
+<line x1="162" y1="310" x2="162" y2="354" stroke="#378ADD" stroke-width="1.5" fill="none" marker-end="url(#a)"/>
+<line x1="456" y1="310" x2="456" y2="354" stroke="#378ADD" stroke-width="1.5" fill="none" marker-end="url(#a)"/>
+<path d="M368 34 L368 66 L4 66 L4 408 L38 408" fill="none" stroke="#BA7517" stroke-width="1.2" stroke-dasharray="5 4" marker-end="url(#a)"/>
+<text x="10" y="62" font-size="9" fill="rgba(186,117,23,.8)">SSH</text>
+<path d="M546 58 L622 58 L622 316 L804 316" fill="none" stroke="#BA7517" stroke-width="1.2" stroke-dasharray="5 4" marker-end="url(#a)"/>
+<text x="567" y="54" font-size="9" fill="rgba(186,117,23,.8)">SSM</text>
+<line x1="20" y1="666" x2="40" y2="666" stroke="#378ADD" stroke-width="1.5"/>
+<text x="44" y="666" dominant-baseline="central" font-size="9" fill="#6e7681">tráfego HTTPS</text>
+<line x1="150" y1="666" x2="170" y2="666" stroke="#BA7517" stroke-width="1.2" stroke-dasharray="5 4"/>
+<text x="174" y="666" dominant-baseline="central" font-size="9" fill="#6e7681">deploy CI/CD</text>
+<line x1="264" y1="666" x2="284" y2="666" stroke="rgba(255,255,255,.2)" stroke-dasharray="4 3" stroke-width="1"/>
+<text x="288" y="666" dominant-baseline="central" font-size="9" fill="#6e7681">DNS / cert</text>
+</svg>
+</div>
+<div class="stats">
+  <div class="stat"><div class="sn" style="color:#f85149">17</div><div class="sl">Regras WAF</div></div>
+  <div class="stat"><div class="sn" style="color:#3fb950">2–4</div><div class="sl">EC2 via ASG</div></div>
+  <div class="stat"><div class="sn" style="color:#58a6ff">TLS 1.3</div><div class="sl">HTTPS + ACM</div></div>
+  <div class="stat"><div class="sn" style="color:#e3b341">CPU 70%</div><div class="sl">Auto Scale</div></div>
+  <div class="stat"><div class="sn" style="color:#a371f7">Terraform</div><div class="sl">IaC ≥ 1.5</div></div>
+</div>
+</body>
+</html>
