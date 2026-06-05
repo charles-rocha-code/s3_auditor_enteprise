@@ -29,6 +29,12 @@ Auditoria avançada de segurança para **AWS S3**, **Google Cloud Storage**, **A
 
 > Alta disponibilidade em `us-east-2` · WAF v2 · ALB · Auto Scaling Group (2–4 EC2) · TLS 1.3 via ACM · Terraform IaC
 
+### Atual vs Futuro
+
+![Arquitetura Atual vs Futura](docs/architecture-current-vs-future.png)
+
+> **Current:** EC2 ASG + WAF v2 + ALB + NAT Gateways · **Future:** ECS Fargate + CloudFront + DynamoDB + S3 + Secrets Manager
+
 ---
 
 ## 📦 Instalação
