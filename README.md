@@ -267,6 +267,8 @@ curl http://localhost:8000/scan/myaccount.blob.core.windows.net
 
 ## 🎯 Arquitetura da Aplicação
 
+![Arquitetura da Aplicação — Security Multicloud Scanner](docs/app-architecture.png)
+
 ```
 FastAPI Server (api_with_mfa.py)
 │
