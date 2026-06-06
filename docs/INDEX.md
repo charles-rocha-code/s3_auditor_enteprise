@@ -1,130 +1,130 @@
-# 📦 S3 Security Auditor v3.0 - Enterprise Edition
+# 📦 S3 Security Auditor v3.0 — Enterprise Edition
 
-## 📋 Índice de Arquivos
+## 📋 File Index
 
-### 🚀 Arquivos Principais
+### 🚀 Main Files
 
 1. **[s3_auditor_improved.py](s3_auditor_improved.py)** ⭐
-   - Script Python principal aprimorado
-   - 39 KB | ~1,100 linhas
-   - Sistema completo de auditoria de segurança S3
+   - Main enhanced Python script
+   - 39 KB | ~1,100 lines
+   - Complete S3 security audit system
 
 2. **[dashboard_improved.html](dashboard_improved.html)** ⭐
-   - Dashboard HTML interativo
-   - 39 KB | ~1,200 linhas
-   - Interface web moderna e responsiva
+   - Interactive HTML dashboard
+   - 39 KB | ~1,200 lines
+   - Modern and responsive web interface
 
-### 📚 Documentação
+### 📚 Documentation
 
-3. **[README_MELHORIAS.md](README_MELHORIAS.md)** 📖
-   - Documentação completa das melhorias
-   - 50+ features implementadas
-   - Guia de instalação e uso detalhado
-   - Checklist de remediação
-   - Referências de segurança AWS
+3. **[IMPROVEMENTS.md](IMPROVEMENTS.md)** 📖
+   - Complete improvements documentation
+   - 50+ features implemented
+   - Detailed installation and usage guide
+   - Remediation checklist
+   - AWS security references
 
-4. **[COMPARATIVO_VERSOES.md](COMPARATIVO_VERSOES.md)** 📊
-   - Comparação visual v2.0 vs v3.0
-   - Exemplos de código antes/depois
-   - Métricas de impacto
-   - Análise detalhada de melhorias
+4. **[VERSION_COMPARISON.md](VERSION_COMPARISON.md)** 📊
+   - Visual comparison v2.0 vs v3.0
+   - Before/after code examples
+   - Impact metrics
+   - Detailed improvement analysis
 
-5. **[GUIA_RAPIDO.md](GUIA_RAPIDO.md)** ⚡
-   - Início rápido (5 minutos)
-   - Comandos essenciais
+5. **[QUICK_START.md](QUICK_START.md)** ⚡
+   - Quick start (5 minutes)
+   - Essential commands
    - Troubleshooting
-   - Top 5 ações imediatas
+   - Top 5 immediate actions
 
 ---
 
-## 🎯 Por Onde Começar?
+## 🎯 Where to Start?
 
-### Para Usar Imediatamente:
-1. 📖 Leia o [GUIA_RAPIDO.md](GUIA_RAPIDO.md) (5 min)
-2. 🔧 Configure: copie `dashboard_improved.html` para `templates/dashboard.html`
-3. 🚀 Execute: `python s3_auditor_improved.py`
-4. 📊 Visualize: abra o HTML gerado no navegador
+### To Use Immediately:
+1. 📖 Read [QUICK_START.md](QUICK_START.md) (5 min)
+2. 🔧 Setup: copy `dashboard_improved.html` to `templates/dashboard.html`
+3. 🚀 Run: `python s3_auditor_improved.py`
+4. 📊 View: open the generated HTML in browser
 
-### Para Entender as Melhorias:
-1. 📊 Veja o [COMPARATIVO_VERSOES.md](COMPARATIVO_VERSOES.md) (10 min)
-2. 📖 Leia o [README_MELHORIAS.md](README_MELHORIAS.md) (20 min)
+### To Understand Improvements:
+1. 📊 See [VERSION_COMPARISON.md](VERSION_COMPARISON.md) (10 min)
+2. 📖 Read [IMPROVEMENTS.md](IMPROVEMENTS.md) (20 min)
 
-### Para Customizar:
-1. 🔍 Estude o código em [s3_auditor_improved.py](s3_auditor_improved.py)
-2. 🎨 Modifique o design em [dashboard_improved.html](dashboard_improved.html)
+### To Customize:
+1. 🔍 Study the code in [s3_auditor_improved.py](s3_auditor_improved.py)
+2. 🎨 Modify the design in [dashboard_improved.html](dashboard_improved.html)
 
 ---
 
-## ✨ Destaques das Melhorias
+## ✨ Improvement Highlights
 
-### 🔐 Segurança
-- ✅ **20+ padrões** de detecção de credenciais (era 5)
-- ✅ **15+ categorias** de arquivos (era 7)
-- ✅ **Score CVSS personalizado** por arquivo
-- ✅ **Recomendações dinâmicas** baseadas em achados
+### 🔐 Security
+- ✅ **20+ patterns** for credential detection (was 5)
+- ✅ **15+ file categories** (was 7)
+- ✅ **Custom CVSS score** per file
+- ✅ **Dynamic recommendations** based on findings
 
 ### 📊 Dashboard
-- ✅ **Design moderno** com gradientes e animações
-- ✅ **100% responsivo** (mobile-first)
-- ✅ **3 gráficos interativos** (era 2)
-- ✅ **Exportação CSV + JSON**
-- ✅ **Modal rico** com recomendações
+- ✅ **Modern design** with gradients and animations
+- ✅ **100% responsive** (mobile-first)
+- ✅ **3 interactive charts** (was 2)
+- ✅ **CSV + JSON export**
+- ✅ **Rich modal** with recommendations
 
 ### 🚀 Performance
-- ✅ **Logs visuais** com emojis e cores
-- ✅ **Progresso em tempo real**
-- ✅ **Sumário executivo** detalhado
-- ✅ **Histórico de 100 scans** (era 50)
+- ✅ **Visual logs** with emojis and colors
+- ✅ **Real-time progress**
+- ✅ **Detailed executive summary**
+- ✅ **History of 100 scans** (was 50)
 
 ---
 
-## 📊 Estatísticas
+## 📊 Statistics
 
-### Linhas de Código
+### Lines of Code
 ```
-s3_auditor_improved.py:    ~1,100 linhas  (+450% vs v2.0)
-dashboard_improved.html:   ~1,200 linhas  (+400% vs v2.0)
-Documentação:              ~1,300 linhas  (nova)
+s3_auditor_improved.py:    ~1,100 lines  (+450% vs v2.0)
+dashboard_improved.html:   ~1,200 lines  (+400% vs v2.0)
+Documentation:             ~1,300 lines  (new)
 ──────────────────────────────────────────────────
-TOTAL:                     ~3,600 linhas
+TOTAL:                     ~3,600 lines
 ```
 
-### Tamanho dos Arquivos
+### File Sizes
 ```
-Script Python:       39 KB
+Python Script:       39 KB
 Dashboard HTML:      39 KB
 README:              14 KB
-Comparativo:         17 KB
-Guia Rápido:         8 KB
+Comparison:          17 KB
+Quick Start:          8 KB
 ──────────────────────────────
 TOTAL:              117 KB
 ```
 
-### Recursos Implementados
+### Implemented Resources
 ```
-Padrões de Detecção:      20+  (era 5)
-Categorias:               15+  (era 7)
-Gráficos:                 3    (era 2)
-Recomendações:            15+  (era 6)
-Metadados no JSON:        25+  (era 10)
+Detection Patterns:       20+  (was 5)
+Categories:               15+  (was 7)
+Charts:                   3    (was 2)
+Recommendations:          15+  (was 6)
+JSON Metadata:            25+  (was 10)
 ```
 
 ---
 
-## 🎨 Estrutura de Arquivos
+## 🎨 File Structure
 
 ```
 📦 S3 Security Auditor v3.0
-├── 📄 s3_auditor_improved.py       # Script principal
-├── 📄 dashboard_improved.html      # Dashboard HTML
-├── 📄 README_MELHORIAS.md          # Documentação completa
-├── 📄 COMPARATIVO_VERSOES.md       # Comparação v2 vs v3
-├── 📄 GUIA_RAPIDO.md               # Início rápido
-└── 📄 INDEX.md                     # Este arquivo
+├── 📄 s3_auditor_improved.py       # Main script
+├── 📄 dashboard_improved.html      # HTML dashboard
+├── 📄 IMPROVEMENTS.md              # Full documentation
+├── 📄 VERSION_COMPARISON.md        # v2 vs v3 comparison
+├── 📄 QUICK_START.md               # Quick start
+└── 📄 INDEX.md                     # This file
 
-Estrutura requerida para execução:
+Required structure for execution:
 📁 templates/
-    └── dashboard.html              # Copiar dashboard_improved.html
+    └── dashboard.html              # Copy from dashboard_improved.html
 📁 reports/
     ├── bucket_YYYYMMDD_HHMMSS.json
     ├── bucket_YYYYMMDD_HHMMSS.html
@@ -134,19 +134,19 @@ Estrutura requerida para execução:
 
 ---
 
-## 🔧 Requisitos do Sistema
+## 🔧 System Requirements
 
 ### Software
-- ✅ Python 3.7+ (testado em 3.8, 3.9, 3.10, 3.11)
-- ✅ pip (gerenciador de pacotes Python)
-- ✅ Navegador moderno (Chrome, Firefox, Safari, Edge)
+- ✅ Python 3.7+ (tested on 3.8, 3.9, 3.10, 3.11)
+- ✅ pip (Python package manager)
+- ✅ Modern browser (Chrome, Firefox, Safari, Edge)
 
-### Dependências Python
+### Python Dependencies
 ```bash
 pip install requests --break-system-packages
 ```
 
-### Sistema Operacional
+### Operating System
 - ✅ Linux (Ubuntu, Debian, RHEL, etc.)
 - ✅ macOS (10.15+)
 - ✅ Windows 10/11
@@ -154,356 +154,109 @@ pip install requests --break-system-packages
 
 ---
 
-## 🚀 Instalação Completa
+## 🚀 Full Installation
 
-### Passo 1: Preparar Ambiente
+### Step 1: Prepare Environment
 ```bash
-# Clone ou baixe os arquivos
-# Certifique-se de ter todos os 5 arquivos:
-# - s3_auditor_improved.py
-# - dashboard_improved.html
-# - README_MELHORIAS.md
-# - COMPARATIVO_VERSOES.md
-# - GUIA_RAPIDO.md
+# Clone or download the files
+# Make sure you have all 5 files
 ```
 
-### Passo 2: Instalar Dependências
+### Step 2: Install Dependencies
 ```bash
 pip install requests --break-system-packages
 ```
 
-### Passo 3: Criar Estrutura
+### Step 3: Create Structure
 ```bash
 mkdir -p templates reports/history
 cp dashboard_improved.html templates/dashboard.html
 ```
 
-### Passo 4: Verificar Instalação
+### Step 4: Verify Installation
 ```bash
-python s3_auditor_improved.py --help 2>/dev/null || echo "Pronto para uso!"
+python s3_auditor_improved.py --help 2>/dev/null || echo "Ready to use!"
 ```
 
-### Passo 5: Primeira Execução
+### Step 5: First Run
 ```bash
 python s3_auditor_improved.py
-# Digite um bucket público para testar
-# Exemplo: flaws.cloud (bucket de treinamento)
+# Enter a public bucket to test
+# Example: flaws.cloud (training bucket)
 ```
 
 ---
 
-## 📖 Guia de Leitura Recomendado
+## 🛡️ Security Checklist
 
-### 🎯 Iniciante (30 minutos)
-1. **[GUIA_RAPIDO.md](GUIA_RAPIDO.md)** (10 min)
-   - Instalação e primeira execução
-   - Comandos essenciais
-   - Troubleshooting básico
+### Before Audit
+- [ ] Check permissions (can list public buckets)
+- [ ] Prepare environment (Python, dependencies)
+- [ ] Have authorization if bucket is not yours
 
-2. **Executar primeira auditoria** (10 min)
-   - Teste com bucket público conhecido
-   - Explore o dashboard HTML
-   - Entenda as métricas
+### During Audit
+- [ ] Monitor console for critical findings
+- [ ] Note important findings
+- [ ] Check progress (files processed)
 
-3. **[README_MELHORIAS.md](README_MELHORIAS.md)** - Seção "Como Usar" (10 min)
-   - Compreenda o fluxo completo
-   - Veja exemplos de output
+### After Audit
+- [ ] Review full HTML dashboard
+- [ ] Prioritize remediations (critical first)
+- [ ] Document security decisions
+- [ ] Share with responsible team
+- [ ] Schedule follow-up (1 week)
 
-### 📊 Intermediário (1 hora)
-1. **[COMPARATIVO_VERSOES.md](COMPARATIVO_VERSOES.md)** (20 min)
-   - Entenda as melhorias implementadas
-   - Compare exemplos de código
-   - Veja métricas de impacto
-
-2. **[README_MELHORIAS.md](README_MELHORIAS.md)** - Completo (30 min)
-   - Leia sobre todas as features
-   - Estude o checklist de remediação
-   - Revise referências de segurança
-
-3. **Prática com seus buckets** (10 min)
-   - Audite buckets reais
-   - Analise descobertas
-   - Implemente remediações
-
-### 🚀 Avançado (2+ horas)
-1. **Código-fonte** - [s3_auditor_improved.py](s3_auditor_improved.py) (1h)
-   - Estude a lógica de classificação
-   - Entenda os padrões regex
-   - Customize para suas necessidades
-
-2. **Dashboard** - [dashboard_improved.html](dashboard_improved.html) (30 min)
-   - Analise a estrutura HTML/CSS/JS
-   - Customize cores e layout
-   - Adicione novos gráficos
-
-3. **Integração** (30 min)
-   - Integre com CI/CD
-   - Automatize auditorias recorrentes
-   - Configure alertas
+### Remediation
+- [ ] Remove critical files (24h)
+- [ ] Rotate exposed credentials (24h)
+- [ ] Audit CloudTrail logs (48h)
+- [ ] Enable Block Public Access (48h)
+- [ ] Implement preventive controls (1 week)
+- [ ] Train team (2 weeks)
 
 ---
 
-## 🎯 Casos de Uso
+## 📊 Success Metrics
 
-### 1. Auditoria de Segurança Única
-```bash
-# Auditar bucket específico
-python s3_auditor_improved.py
-# Input: meu-bucket-producao
-
-# Analisar relatório HTML
-open reports/meu-bucket-producao_*.html
-
-# Remediar descobertas críticas
-# Seguir recomendações personalizadas
+### Risk Score (Target)
+```
+Initial:    8.5/10  🔴 Critical
+1 week:     6.0/10  🟠 High
+1 month:    4.0/10  🟡 Medium
+3 months:   2.5/10  🟢 Low
+6 months:   1.5/10  🟢 Excellent
 ```
 
-### 2. Auditoria de Múltiplos Buckets
-```bash
-# Auditar vários buckets de uma vez
-python s3_auditor_improved.py
-# Input: bucket1,bucket2,bucket3,bucket4
-
-# Comparar scores no histórico
-# Priorizar remediações por score CVSS
+### Critical Files (Target)
+```
+Initial:    15 critical files
+1 week:     5 critical files
+1 month:    0 critical files ✅
 ```
 
-### 3. Auditoria Recorrente (CI/CD)
-```bash
-# Script bash para cron
-#!/bin/bash
-python s3_auditor_improved.py <<EOF
-meu-bucket
-10000
-EOF
-
-# Enviar alertas se score > 7.0
-SCORE=$(jq '.summary.risk_score' reports/meu-bucket_*.json | tail -1)
-if (( $(echo "$SCORE > 7.0" | bc -l) )); then
-  echo "⚠️ Score alto: $SCORE" | mail -s "Alerta S3" security@company.com
-fi
+### Compliance (Target)
 ```
-
-### 4. Compliance e Auditoria
-```bash
-# Gerar relatório mensal
-python s3_auditor_improved.py
-# Exportar CSV do dashboard
-# Compartilhar com compliance/auditoria
-
-# Documentar remediações
-# Manter histórico de 100 scans
+Initial:    30% of controls
+1 month:    60% of controls
+3 months:   90% of controls
+6 months:   100% of controls ✅
 ```
 
 ---
 
-## 🛡️ Checklist de Segurança
+## ✅ Final Verification
 
-### Antes da Auditoria
-- [ ] Verificar permissões (pode listar buckets públicos)
-- [ ] Preparar ambiente (Python, dependências)
-- [ ] Ter autorização se bucket não é seu
+Before starting, make sure you have:
 
-### Durante a Auditoria
-- [ ] Monitorar console para descobertas críticas
-- [ ] Anotar achados importantes
-- [ ] Verificar progresso (arquivos processados)
+- [ ] ✅ Python 3.7+ installed
+- [ ] ✅ `requests` library installed
+- [ ] ✅ All 5 files downloaded
+- [ ] ✅ Directory structure created (`templates/`, `reports/history/`)
+- [ ] ✅ Dashboard copied to `templates/dashboard.html`
+- [ ] ✅ Public bucket to test (or your own buckets)
+- [ ] ✅ Authorization to audit chosen buckets
 
-### Após a Auditoria
-- [ ] Revisar dashboard HTML completo
-- [ ] Priorizar remediações (críticas primeiro)
-- [ ] Documentar decisões de segurança
-- [ ] Compartilhar com equipe responsável
-- [ ] Agendar follow-up (1 semana)
-
-### Remediação
-- [ ] Remover arquivos críticos (24h)
-- [ ] Rotacionar credenciais expostas (24h)
-- [ ] Auditar CloudTrail logs (48h)
-- [ ] Ativar Block Public Access (48h)
-- [ ] Implementar controles preventivos (1 semana)
-- [ ] Treinar equipe (2 semanas)
-
----
-
-## 📞 Suporte e Comunidade
-
-### Problemas Técnicos
-1. Consulte [GUIA_RAPIDO.md](GUIA_RAPIDO.md) - Seção Troubleshooting
-2. Verifique versão Python: `python --version`
-3. Reinstale dependências: `pip install requests --force-reinstall`
-4. Teste com bucket público conhecido (ex: flaws.cloud)
-
-### Melhorias e Sugestões
-- Customize o código para suas necessidades
-- Adicione novos padrões de detecção
-- Melhore o dashboard HTML
-- Compartilhe com sua equipe
-
-### Recursos Externos
-- **AWS S3 Docs:** https://docs.aws.amazon.com/s3/
-- **OWASP:** https://owasp.org/www-project-top-ten/
-- **CIS Benchmarks:** https://www.cisecurity.org/cis-benchmarks/
-
----
-
-## 📊 Métricas de Sucesso
-
-### Score de Risco (Meta)
-```
-Inicial:    8.5/10  🔴 Crítico
-1 semana:   6.0/10  🟠 Alto
-1 mês:      4.0/10  🟡 Médio
-3 meses:    2.5/10  🟢 Baixo
-6 meses:    1.5/10  🟢 Ótimo
-```
-
-### Arquivos Críticos (Meta)
-```
-Inicial:    15 arquivos críticos
-1 semana:   5 arquivos críticos
-1 mês:      0 arquivos críticos ✅
-```
-
-### Conformidade (Meta)
-```
-Inicial:    30% dos controles
-1 mês:      60% dos controles
-3 meses:    90% dos controles
-6 meses:    100% dos controles ✅
-```
-
----
-
-## 🎉 Começando Agora
-
-### Comando Único (Copy & Paste)
-```bash
-# Instalar, configurar e executar
-pip install requests --break-system-packages && \
-mkdir -p templates reports/history && \
-cp dashboard_improved.html templates/dashboard.html && \
-python s3_auditor_improved.py
-```
-
-### Resultado Esperado
-```
-🔐 AUDITORIA DE SEGURANÇA S3 v3.0
-==================================
-✅ Região detectada
-🚨 Descobertas críticas (se houver)
-📊 Arquivos processados
-⏱️ Tempo de execução
-📄 Relatórios gerados
-```
-
----
-
-## 📄 Licença e Disclaimer
-
-### Uso
-Este código é fornecido como ferramenta educacional e profissional para auditorias de segurança legítimas em infraestrutura AWS S3.
-
-### Responsabilidade
-- ✅ Use apenas em buckets que você possui ou tem autorização
-- ✅ Respeite leis de privacidade (LGPD, GDPR)
-- ✅ Não compartilhe relatórios com dados sensíveis
-- ❌ Não use para fins maliciosos
-- ❌ Não teste buckets de terceiros sem autorização
-
----
-
-## 🏆 Créditos
-
-**S3 Security Auditor v3.0 - Enterprise Edition**
-
-Desenvolvido como ferramenta profissional para:
-- 🔐 Auditorias de segurança em AWS S3
-- 📊 Detecção de vulnerabilidades e exposições
-- 🛡️ Compliance e governança
-- 📈 Monitoramento contínuo de postura de segurança
-
-**Tecnologias:**
-- Python 3.7+
-- Requests (HTTP)
-- Chart.js (Gráficos)
-- Bootstrap 5 (UI)
-- DataTables (Tabelas)
-- Font Awesome (Ícones)
-
----
-
-## 🗺️ Roadmap Futuro
-
-### v3.1 (Próxima Release)
-- [ ] Integração com AWS CLI/Boto3 (scan autenticado)
-- [ ] Análise de conteúdo de arquivos suspeitos
-- [ ] Suporte a multi-região simultâneo
-- [ ] API REST para integração CI/CD
-
-### v3.2 (Futuro)
-- [ ] Machine Learning para detecção de anomalias
-- [ ] Integração com SIEM (Splunk, ELK)
-- [ ] Notificações automáticas (Email, Slack, Teams)
-- [ ] Suporte a outros provedores (Azure Blob, GCP Storage)
-
-### v4.0 (Visão de Longo Prazo)
-- [ ] Plataforma web completa
-- [ ] Dashboard em tempo real
-- [ ] Orquestração de remediação automática
-- [ ] Compliance framework integrado
-
----
-
-## 📚 Arquivos Complementares
-
-### Documentação
-- **README_MELHORIAS.md** (14 KB)
-  - Documentação técnica completa
-  - Guia de instalação detalhado
-  - Referências de segurança AWS
-  - Checklist de remediação
-
-- **COMPARATIVO_VERSOES.md** (17 KB)
-  - Análise comparativa v2.0 vs v3.0
-  - Exemplos de código antes/depois
-  - Métricas de impacto quantificadas
-  - Visualizações de melhorias
-
-- **GUIA_RAPIDO.md** (8 KB)
-  - Início rápido (5 minutos)
-  - Comandos essenciais
-  - Troubleshooting comum
-  - Dicas profissionais
-
-### Código
-- **s3_auditor_improved.py** (39 KB)
-  - Script principal aprimorado
-  - 1,100+ linhas de código Python
-  - 20+ padrões de detecção
-  - Sistema completo de classificação
-
-- **dashboard_improved.html** (39 KB)
-  - Interface web moderna
-  - 1,200+ linhas HTML/CSS/JS
-  - 3 gráficos interativos
-  - Exportação CSV/JSON
-
----
-
-## ✅ Verificação Final
-
-Antes de começar, certifique-se de ter:
-
-- [ ] ✅ Python 3.7+ instalado
-- [ ] ✅ Biblioteca `requests` instalada
-- [ ] ✅ Todos os 5 arquivos baixados
-- [ ] ✅ Estrutura de diretórios criada (`templates/`, `reports/history/`)
-- [ ] ✅ Dashboard copiado para `templates/dashboard.html`
-- [ ] ✅ Bucket público para testar (ou seus próprios buckets)
-- [ ] ✅ Autorização para auditar os buckets escolhidos
-
-Se todos os itens estão marcados: **Você está pronto! 🚀**
+If all items are checked: **You're ready! 🚀**
 
 ```bash
 python s3_auditor_improved.py
@@ -511,12 +264,10 @@ python s3_auditor_improved.py
 
 ---
 
-**🔐 S3 Security Auditor v3.0 - Proteja sua infraestrutura AWS**
+**🔐 S3 Security Auditor v3.0 — Protect your AWS infrastructure**
 
-*Auditoria profissional • Detecção inteligente • Remediação guiada*
+*Professional auditing · Smart detection · Guided remediation*
 
-**Última atualização:** 2024-12-08
-**Versão:** 3.0 Enterprise Edition
+**Last updated:** 2024-12-08
+**Version:** 3.0 Enterprise Edition
 **Status:** ✅ Production Ready
-
----
