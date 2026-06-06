@@ -1,105 +1,107 @@
-# 🔒 Segurança — Security Multicloud Scanner
+# 🔒 Security — Security Multicloud Scanner
 
-## Visão Geral
+## Overview
 
-Este documento descreve todas as medidas de segurança implementadas no ambiente de produção do **Security Multicloud Scanner**.
+This document describes all security measures implemented in the **Security Multicloud Scanner** production environment.
 
 ---
 
-## 🏗️ Arquitetura de Segurança
+## 🏗️ Security Architecture
 
 ```
 Internet
     │
     ▼
-[ALB / HTTPS 443]  ←── Certificado SSL/TLS
+[ALB / HTTPS 443]  ←── SSL/TLS Certificate
     │
     ▼
-[AWS Security Group]  ←── Firewall de rede
+[AWS Security Group]  ←── Network Firewall
     │
     ▼
 [EC2 - Ubuntu]  ←── Fail2Ban + Rate Limiting
     │
     ▼
-[API - FastAPI + MFA]  ←── Autenticação obrigatória
+[API - FastAPI + MFA]  ←── Mandatory Authentication
 ```
 
 ---
 
 ## ☁️ AWS — Security Group (Firewall)
 
-### Regras de Entrada
+### Inbound Rules
 
-| Protocolo | Porta | Origem | Finalidade |
+| Protocol | Port | Source | Purpose |
 |---|---|---|---|
-| TCP | 22 (SSH) | `179.228.23.2/32` | Acesso administrativo |
-| TCP | 443 (HTTPS) | `0.0.0.0/0` | Acesso público à aplicação |
-| TCP | 80 (HTTP) | `0.0.0.0/0` | Redirect HTTP → HTTPS |
-| TCP | 8000 | `security-scanner-alb-sg` | Tráfego interno do Application Load Balancer |
-
-## 🔐 Autenticação — MFA Obrigatório
-
-A aplicação utiliza autenticação em dois fatores (MFA) obrigatória para todos os usuários.
-
-### Fluxo de autenticação
-
-```
-Usuário acessa /login
-    │
-    ▼
-Insere e-mail + senha
-    │
-    ▼
-Insere código TOTP (Google Authenticator / Authy)
-    │
-    ▼
-Cookie de sessão gerado (scanner_session)
-    │
-    ▼
-Acesso liberado ao dashboard
-```
-
-### Tecnologias utilizadas
-
-- `pyotp` — geração e validação de tokens TOTP
-- `qrcode` — QR Code para configuração do autenticador
-- `email-validator` + `pydantic[email]` — validação de e-mails
-- Cookies de sessão com `HttpOnly` e `Secure`
+| TCP | 22 (SSH) | `179.228.23.2/32` | Administrative access |
+| TCP | 443 (HTTPS) | `0.0.0.0/0` | Public application access |
+| TCP | 80 (HTTP) | `0.0.0.0/0` | HTTP → HTTPS redirect |
+| TCP | 8000 | `security-scanner-alb-sg` | Internal ALB traffic |
 
 ---
 
-## 🛡️ Fail2Ban — Proteção contra Ataques
+## 🔐 Authentication — Mandatory MFA
 
-O **Fail2Ban** monitora os logs e bane automaticamente IPs maliciosos.
+The application uses mandatory two-factor authentication (MFA) for all users.
 
-### Configuração
+### Authentication Flow
 
-| Jail | Porta | Max tentativas | Tempo de ban |
+```
+User accesses /login
+    │
+    ▼
+Enters email + password
+    │
+    ▼
+Enters TOTP code (Google Authenticator / Authy)
+    │
+    ▼
+Session cookie generated (scanner_session)
+    │
+    ▼
+Dashboard access granted
+```
+
+### Technologies Used
+
+- `pyotp` — TOTP token generation and validation
+- `qrcode` — QR Code for authenticator setup
+- `email-validator` + `pydantic[email]` — Email validation
+- Session cookies with `HttpOnly` and `Secure` flags
+
+---
+
+## 🛡️ Fail2Ban — Attack Protection
+
+**Fail2Ban** monitors logs and automatically bans malicious IPs.
+
+### Configuration
+
+| Jail | Port | Max Attempts | Ban Duration |
 |---|---|---|---|
-| `sshd` | 22 | 3 tentativas | 24 horas |
-| `http-scan` | 80, 443, 8000 | 20 tentativas | 2 horas |
+| `sshd` | 22 | 3 attempts | 24 hours |
+| `http-scan` | 80, 443, 8000 | 20 attempts | 2 hours |
 
-### Padrões detectados e banidos
+### Detected and Banned Patterns
 
-- Tentativas de explorar PHPUnit (`/vendor/phpunit/...`)
-- Tentativas de explorar Laravel (`/laravel/vendor/...`)
-- Tentativas de acesso a `.env`, `wp-admin`, `shell`, `cmd`
+- PHPUnit exploit attempts (`/vendor/phpunit/...`)
+- Laravel exploit attempts (`/laravel/vendor/...`)
+- Access to `.env`, `wp-admin`, `shell`, `cmd`
 - Path traversal (`../../../`)
 - XML-RPC attacks
 
-### Comandos de monitoramento
+### Monitoring Commands
 
 ```bash
-# Ver status geral
+# Check overall status
 sudo fail2ban-client status
 
-# Ver IPs banidos no jail SSH
+# See banned IPs in SSH jail
 sudo fail2ban-client status sshd
 
-# Ver IPs banidos no jail HTTP
+# See banned IPs in HTTP jail
 sudo fail2ban-client status http-scan
 
-# Desbanir um IP manualmente
+# Manually unban an IP
 sudo fail2ban-client set http-scan unbanip <IP>
 ```
 
@@ -107,75 +109,75 @@ sudo fail2ban-client set http-scan unbanip <IP>
 
 ## 🚀 Deploy — GitHub Actions
 
-O deploy em produção é 100% automatizado via **GitHub Actions**.
+Production deployment is 100% automated via **GitHub Actions**.
 
-### Fluxo
+### Flow
 
 ```
 git push origin main
     │
     ▼
-GitHub Actions dispara
+GitHub Actions triggers
     │
     ▼
-Conecta no servidor via SSH (porta 22)
-usando secrets criptografados
+Connects to server via SSH (port 22)
+using encrypted secrets
     │
     ▼
-git pull + pip install + restart da aplicação
+git pull + pip install + application restart
     │
     ▼
-✅ Produção atualizada em ~16 segundos
+✅ Production updated in ~16 seconds
 ```
 
-### Secrets configurados
+### Configured Secrets
 
-| Secret | Descrição |
+| Secret | Description |
 |---|---|
-| `AWS_HOST` | IP público do servidor EC2 |
-| `AWS_SSH_KEY` | Chave privada SSH (.pem) |
+| `AWS_HOST` | EC2 server public IP |
+| `AWS_SSH_KEY` | SSH private key (.pem) |
 
-> Os secrets são armazenados de forma criptografada no GitHub e nunca expostos nos logs.
-
----
-
-## 🔄 HTTPS — Certificado SSL/TLS
-
-- Tráfego HTTP (porta 80) é redirecionado automaticamente para HTTPS (301)
-- Certificado SSL válido em `scanner.oisolucoes.app.br`
-- Comunicação cliente ↔ servidor totalmente criptografada
+> Secrets are stored encrypted in GitHub and never exposed in logs.
 
 ---
 
-## 📋 Checklist de Segurança
+## 🔄 HTTPS — SSL/TLS Certificate
 
-- [x] MFA obrigatório para todos os usuários
-- [x] SSH restrito a IPs específicos (GitHub Actions + admin)
-- [x] HTTPS com certificado SSL válido
-- [x] HTTP redireciona para HTTPS
-- [x] Fail2Ban ativo (sshd + http-scan)
-- [x] Deploy automatizado sem exposição de credenciais
-- [x] Secrets criptografados no GitHub Actions
-- [x] Porta 8000 acessível apenas via Security Group interno
-- [ ] Rate limiting na API *(em implementação)*
-- [ ] WAF (Web Application Firewall) *(planejado)*
+- HTTP traffic (port 80) is automatically redirected to HTTPS (301)
+- Valid SSL certificate at `scanner.oisolucoes.app.br`
+- Client ↔ server communication fully encrypted
 
 ---
 
-## 🚨 Reporte de Vulnerabilidades
+## 📋 Security Checklist
 
-Se você encontrar alguma vulnerabilidade de segurança, **não abra uma issue pública**.
-
-Entre em contato diretamente pelo e-mail do administrador do repositório.
+- [x] MFA mandatory for all users
+- [x] SSH restricted to specific IPs (GitHub Actions + admin)
+- [x] HTTPS with valid SSL certificate
+- [x] HTTP redirects to HTTPS
+- [x] Fail2Ban active (sshd + http-scan)
+- [x] Automated deploy without credential exposure
+- [x] Encrypted secrets in GitHub Actions
+- [x] Port 8000 accessible only via internal Security Group
+- [ ] API rate limiting *(in progress)*
+- [ ] WAF (Web Application Firewall) *(planned)*
 
 ---
 
-## 📅 Histórico de Atualizações de Segurança
+## 🚨 Vulnerability Reporting
 
-| Data | Descrição |
+If you find a security vulnerability, **do not open a public issue**.
+
+Contact the repository administrator directly via email.
+
+---
+
+## 📅 Security Update History
+
+| Date | Description |
 |---|---|
-| 2026-03-01 | Implementação do MFA obrigatório |
-| 2026-03-01 | Configuração do Fail2Ban (sshd + http-scan) |
-| 2026-03-01 | Restrição da porta SSH aos IPs do GitHub Actions |
-| 2026-03-01 | Deploy automático via GitHub Actions |
-| 2026-03-01 | Correção de autenticação nas chamadas de scan (credentials: include) |
+| 2026-03-01 | Mandatory MFA implementation |
+| 2026-03-01 | Fail2Ban configuration (sshd + http-scan) |
+| 2026-03-01 | SSH port restriction to GitHub Actions IPs |
+| 2026-03-01 | Automated deploy via GitHub Actions |
+| 2026-03-01 | Authentication fix for scan calls |
