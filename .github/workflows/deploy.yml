@@ -1,35 +1,71 @@
-name: 🚀 Deploy Automático para AWS
+name: Deploy to AWS
 
 on:
   push:
     branches:
       - main
 
+concurrency:
+  group: production-deploy
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
 jobs:
   deploy:
-    name: Deploy para Servidor AWS
+    name: Deploy to AWS Server
     runs-on: ubuntu-latest
+    environment: production  # enables manual approval gate in GitHub
 
     steps:
-      - name: 🔗 Conectar e atualizar servidor
-        uses: appleboy/ssh-action@v1.0.3
+      - name: Connect and update server
+        # Pinned by SHA — not just tag
+        uses: appleboy/ssh-action@029f5b4aeeeb58fdfe1410a5d17f967dacf36262  # v1.0.3
         with:
           host: ${{ secrets.AWS_HOST }}
           username: ubuntu
           key: ${{ secrets.AWS_SSH_KEY }}
+          port: 22
+          script_stop: true
           script: |
-            echo "📦 Atualizando código..."
-            cd ~/security-multicloud-scanner
-            git pull origin main
+            set -euo pipefail
 
-            echo "📦 Atualizando dependências..."
+            APP_DIR=~/security-multicloud-scanner
+
+            echo "--- Updating code ---"
+            cd "$APP_DIR"
+            git fetch origin main
+            git reset --hard origin/main
+            git clean -fd
+
+            echo "--- Updating dependencies ---"
             source venv/bin/activate
             pip install -r requirements.txt -q
 
-            echo "🔄 Reiniciando aplicação..."
-            fuser -k 8000/tcp || true
-            sleep 2
-            mkdir -p logs
-            nohup python api_with_mfa.py > logs/api.log 2>&1 &
+            echo "--- Restarting application ---"
+            if systemctl is-active --quiet security-scanner 2>/dev/null; then
+              sudo systemctl restart security-scanner
+            else
+              pkill -f "uvicorn api_with_mfa" || true
+              sleep 2
+              mkdir -p logs
+              nohup python3 -m uvicorn api_with_mfa:app \
+                --host 127.0.0.1 \
+                --port 8000 \
+                > logs/api.log 2>&1 &
+              disown
+            fi
 
-            echo "✅ Deploy concluído! PID: $!"
+            echo "--- Health check ---"
+            for i in $(seq 1 15); do
+              if curl -sf http://127.0.0.1:8000/health > /dev/null 2>&1; then
+                echo "✅ Deploy successful after ${i}s"
+                exit 0
+              fi
+              sleep 2
+            done
+
+            echo "❌ Server did not respond after 30s"
+            tail -50 logs/api.log 2>/dev/null || true
+            exit 1
