@@ -47,10 +47,10 @@ jobs:
             if systemctl is-active --quiet security-scanner 2>/dev/null; then
               sudo systemctl restart security-scanner
             else
-              pkill -f "uvicorn api_with_mfa" || true
+              pkill -f "uvicorn api_with_mfa_fix" || true
               sleep 2
               mkdir -p logs
-              nohup python3 -m uvicorn api_with_mfa:app \
+              nohup python3 -m uvicorn api_with_mfa_fix:app \
                 --host 127.0.0.1 \
                 --port 8000 \
                 > logs/api.log 2>&1 &
