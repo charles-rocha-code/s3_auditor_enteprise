@@ -14,58 +14,106 @@ permissions:
 
 jobs:
   deploy:
-    name: Deploy to AWS Server
+    name: Deploy — todas as instâncias via SSM (ASG dinâmico)
     runs-on: ubuntu-latest
-    environment: production  # enables manual approval gate in GitHub
 
     steps:
-      - name: Connect and update server
-        # Pinned by SHA — not just tag
-        uses: appleboy/ssh-action@029f5b4aeeeb58fdfe1410a5d17f967dacf36262  # v1.0.3
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@e7f100cf4c008499ea8adda475de1042d6975c7b  # v6.2.0
         with:
-          host: ${{ secrets.AWS_HOST }}
-          username: ubuntu
-          key: ${{ secrets.AWS_SSH_KEY }}
-          port: 22
-          script_stop: true
-          script: |
-            set -euo pipefail
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-2
 
-            APP_DIR=~/security-multicloud-scanner
+      - name: Deploy via SSM em todas as instâncias do ASG
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
 
-            echo "--- Updating code ---"
-            cd "$APP_DIR"
-            git fetch origin main
-            git reset --hard origin/main
-            git clean -fd
+          REGION="us-east-2"
+          APP_DIR="/home/ubuntu/security-scanner"
 
-            echo "--- Updating dependencies ---"
-            source venv/bin/activate
-            pip install -r requirements.txt -q
+          # Descobre dinamicamente todas as instâncias healthy do ASG
+          INSTANCE_IDS=$(aws autoscaling describe-auto-scaling-groups \
+            --region "$REGION" \
+            --query "AutoScalingGroups[].Instances[?HealthStatus=='Healthy'].InstanceId" \
+            --output text | tr '\t' ' ')
 
-            echo "--- Restarting application ---"
-            if systemctl is-active --quiet security-scanner 2>/dev/null; then
-              sudo systemctl restart security-scanner
-            else
-              pkill -f "uvicorn api_with_mfa_fix" || true
-              sleep 2
-              mkdir -p logs
-              nohup python3 -m uvicorn api_with_mfa_fix:app \
-                --host 127.0.0.1 \
-                --port 8000 \
-                > logs/api.log 2>&1 &
-              disown
-            fi
+          echo "Instâncias encontradas: $INSTANCE_IDS"
 
-            echo "--- Health check ---"
-            for i in $(seq 1 15); do
-              if curl -sf http://127.0.0.1:8000/health > /dev/null 2>&1; then
-                echo "✅ Deploy successful after ${i}s"
-                exit 0
-              fi
-              sleep 2
+          if [ -z "$INSTANCE_IDS" ]; then
+            echo "❌ Nenhuma instância encontrada no ASG"
+            exit 1
+          fi
+
+          FAILED=0
+
+          # Deploy sequencial para evitar downtime (rolling deploy)
+          for INSTANCE_ID in $INSTANCE_IDS; do
+            echo ""
+            echo "=== Deployando em $INSTANCE_ID ==="
+
+            COMMAND_ID=$(aws ssm send-command \
+              --instance-ids "$INSTANCE_ID" \
+              --document-name "AWS-RunShellScript" \
+              --timeout-seconds 180 \
+              --parameters "commands=[\
+                \"set -eu\",\
+                \"export HOME=/root\",\
+                \"if [ ! -d $APP_DIR ]; then echo 'SKIP - app nao instalado nesta instancia'; exit 0; fi\",\
+                \"git config --global --add safe.directory $APP_DIR\",\
+                \"cd $APP_DIR\",\
+                \"git remote set-url origin 'https://x-access-token:${GH_TOKEN}@github.com/charles-rocha-code/s3_auditor_enteprise.git'\",\
+                \"git fetch origin main\",\
+                \"git reset --hard origin/main\",\
+                \"git clean -fd\",\
+                \"git remote set-url origin 'https://github.com/charles-rocha-code/s3_auditor_enteprise.git'\",\
+                \"chown -R ubuntu:ubuntu $APP_DIR\",\
+                \"sudo -u ubuntu $APP_DIR/venv/bin/pip install -r $APP_DIR/requirements.txt -q\",\
+                \"sudo systemctl restart security-scanner\",\
+                \"sleep 8\",\
+                \"curl -sf http://127.0.0.1:8000/health && echo HEALTH_OK\"\
+              ]" \
+              --region "$REGION" \
+              --query 'Command.CommandId' \
+              --output text)
+
+            echo "SSM Command ID: $COMMAND_ID"
+
+            # Poll com timeout
+            STATUS="Pending"
+            for i in $(seq 1 24); do
+              sleep 5
+              STATUS=$(aws ssm get-command-invocation \
+                --command-id "$COMMAND_ID" \
+                --instance-id "$INSTANCE_ID" \
+                --region "$REGION" \
+                --query 'Status' \
+                --output text 2>/dev/null || echo "Pending")
+
+              echo "[${i}] $INSTANCE_ID — Status: $STATUS"
+
+              case "$STATUS" in
+                Success)
+                  echo "✅ $INSTANCE_ID — deploy concluído"
+                  break
+                  ;;
+                Failed|Cancelled|TimedOut|DeliveryTimedOut|ExecutionTimedOut)
+                  echo "❌ $INSTANCE_ID — falhou (Status: $STATUS)"
+                  aws ssm get-command-invocation \
+                    --command-id "$COMMAND_ID" \
+                    --instance-id "$INSTANCE_ID" \
+                    --region "$REGION" \
+                    --query 'StandardErrorContent' \
+                    --output text || true
+                  FAILED=1
+                  break
+                  ;;
+              esac
             done
 
-            echo "❌ Server did not respond after 30s"
-            tail -50 logs/api.log 2>/dev/null || true
-            exit 1
+            [ "$STATUS" = "Success" ] || { echo "❌ Timeout em $INSTANCE_ID"; FAILED=1; }
+          done
+
+          [ $FAILED -eq 0 ] && echo "" && echo "✅ Deploy concluído em todas as instâncias" || exit 1
