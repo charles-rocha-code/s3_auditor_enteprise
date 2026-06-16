@@ -71,6 +71,10 @@ jobs:
                 \"git remote set-url origin 'https://github.com/charles-rocha-code/s3_auditor_enteprise.git'\",\
                 \"chown -R ubuntu:ubuntu $APP_DIR\",\
                 \"sudo -u ubuntu $APP_DIR/venv/bin/pip install -r $APP_DIR/requirements.txt 2>&1 || { echo PIP_FAILED; exit 1; }\",\
+                \"echo '--- Service file ---'\",\
+                \"systemctl cat security-scanner || true\",\
+                \"echo '--- Python import test ---'\",\
+                \"cd $APP_DIR && sudo -u ubuntu $APP_DIR/venv/bin/python -c 'import api_with_mfa_fix' 2>&1 || true\",\
                 \"sudo systemctl restart security-scanner || { journalctl -u security-scanner -n 50 --no-pager; exit 1; }\",\
                 \"sleep 8\",\
                 \"curl -sf http://127.0.0.1:8000/health && echo HEALTH_OK || { journalctl -u security-scanner -n 50 --no-pager; exit 7; }\"\
