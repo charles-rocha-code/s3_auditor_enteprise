@@ -461,29 +461,25 @@ def ratelimit_test(request: Request):
 
 @app.get("/login", response_class=HTMLResponse, include_in_schema=False)
 def login_page(request: Request):
-    return templates.TemplateResponse("login.html", {"request": request})
+    return templates.TemplateResponse(request, "login.html")
 
 
 @app.get("/mfa/setup", response_class=HTMLResponse, include_in_schema=False)
 def mfa_setup_page(request: Request):
-    return templates.TemplateResponse("mfa_setup.html", {"request": request})
+    return templates.TemplateResponse(request, "mfa_setup.html")
 
 
 @app.get("/dashboard", response_class=HTMLResponse, include_in_schema=False)
 def dashboard_page(request: Request):
-    return templates.TemplateResponse("dashboard.html", {"request": request})
+    return templates.TemplateResponse(request, "dashboard.html")
 
 
 @app.get("/forgot-password", response_class=HTMLResponse, include_in_schema=False)
 def forgot_password_page(request: Request):
     return templates.TemplateResponse(
+        request,
         "forgot_password.html",
-        {
-            "request": request,
-            "success": False,
-            "message": None,
-            "reset_link": None,
-        },
+        {"success": False, "message": None, "reset_link": None},
     )
 
 
@@ -495,12 +491,9 @@ def reset_password_page(request: Request, email: str, token: str):
         return HTMLResponse("<h2>Link inválido ou expirado.</h2>", status_code=400)
 
     return templates.TemplateResponse(
+        request,
         "reset_password.html",
-        {
-            "request": request,
-            "email": email,
-            "token": token,
-        },
+        {"email": email, "token": token},
     )
 
 # -----------------------------------------------------------------------------
@@ -596,13 +589,13 @@ def forgot_password_submit(request: Request, email: str = Form(...)):
             print(f"Erro email: {e}")
 
     return templates.TemplateResponse(
+        request,
         "forgot_password.html",
         {
-            "request": request,
             "success": True,
             "message": "Se o e-mail existir em nossa base, um link de recuperação foi enviado.",
-            "reset_link": reset_link
-        }
+            "reset_link": reset_link,
+        },
     )
 
 
