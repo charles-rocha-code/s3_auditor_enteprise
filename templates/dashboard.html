@@ -2211,35 +2211,74 @@ function logout() {
       }
     }
 
+    // ============================================================
+    // Polling — aguarda job assíncrono concluir
+    // ============================================================
+    function pollJobUntilDone(job_id, scanBtn, btnLabel) {
+      const token = getAuthToken();
+      const headers = { "Authorization": `Bearer ${token}` };
+      let dots = 0;
+
+      const interval = setInterval(async () => {
+        dots = (dots + 1) % 4;
+        scanBtn.textContent = "⏳ Scaneando" + ".".repeat(dots + 1);
+
+        try {
+          const res = await fetch(`/scan/status/${job_id}`, { headers, credentials: "include" });
+          const { status, error } = await res.json();
+
+          if (status === "done") {
+            clearInterval(interval);
+            const resultRes = await fetch(`/scan/result/${job_id}`, { headers, credentials: "include" });
+            const data = await resultRes.json();
+            console.log("ASYNC SCAN RESULT:", data);
+            updateUI(data);
+            saveScanToHistory(data);
+            showActionButtons();
+            scanBtn.disabled = false;
+            scanBtn.textContent = btnLabel;
+          } else if (status === "error") {
+            clearInterval(interval);
+            alert("Erro no scan: " + (error || "desconhecido"));
+            scanBtn.disabled = false;
+            scanBtn.textContent = btnLabel;
+          }
+        } catch (err) {
+          clearInterval(interval);
+          console.error(err);
+          alert("Erro ao verificar status do scan.");
+          scanBtn.disabled = false;
+          scanBtn.textContent = btnLabel;
+        }
+      }, 2000);
+    }
+
     function startPublicScan(bucket) {
       const scanBtn = document.getElementById("scan-btn");
       scanBtn.disabled = true;
       scanBtn.textContent = "⏳ Scaneando...";
-      
-      // Reset filtros antes do scan
+
       resetFilters();
-      
       animateScanStart();
 
-      fetch("/scan/" + encodeURIComponent(bucket), { headers: { "Authorization": `Bearer ${getAuthToken()}` }, credentials: "include" })
+      const token = getAuthToken();
+      fetch("/scan/start", {
+        method: "POST",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { "Authorization": `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify({ provider: "UNIVERSAL", bucket: bucket, max_objects: 5000 })
+      })
         .then(res => res.json())
-        .then(data => {
-          console.log("SCAN RESULT:", data);
-          if (data.error) {
-            alert(data.error);
-            return;
-          }
-          updateUI(data);
-          saveScanToHistory(data);
-          
-          // Mostrar botões de relatório após scan bem-sucedido
-          showActionButtons();
+        .then(({ job_id, detail }) => {
+          if (!job_id) { alert(detail || "Erro ao iniciar scan."); scanBtn.disabled = false; scanBtn.textContent = "▶ Iniciar Scan"; return; }
+          pollJobUntilDone(job_id, scanBtn, "▶ Iniciar Scan");
         })
         .catch(err => {
           console.error(err);
-          alert("Erro ao conectar com a API /scan.");
-        })
-        .finally(() => {
+          alert("Erro ao conectar com a API /scan/start.");
           scanBtn.disabled = false;
           scanBtn.textContent = "▶ Iniciar Scan";
         });
@@ -2262,8 +2301,8 @@ function logout() {
 
   let payload = {
     bucket: bucket,
-    provider: providerMap[provider] || provider.toUpperCase(),  // ← LINHA NOVA
-    max_objects: 1000
+    provider: providerMap[provider] || provider.toUpperCase(),
+    max_objects: 5000
   };
 
       // Validação e montagem do payload por provider
@@ -2326,7 +2365,7 @@ function logout() {
 
       const __token = (localStorage.getItem("scanner_token") || localStorage.getItem("token") || "");
 
-      fetch("/scan/authenticated", {
+      fetch("/scan/start", {
         method: "POST",
         credentials: "include",
         headers: {
@@ -2336,23 +2375,18 @@ function logout() {
         body: JSON.stringify(payload)
       })
         .then(res => res.json())
-        .then(data => {
-          console.log("AUTHENTICATED SCAN RESULT:", data);
-          if (data.error || data.detail) {
-            alert(data.error || data.detail);
+        .then(({ job_id, detail }) => {
+          if (!job_id) {
+            alert(detail || "Erro ao iniciar scan.");
+            scanBtn.disabled = false;
+            scanBtn.textContent = "▶ Iniciar Scan";
             return;
           }
-          updateUI(data);
-          saveScanToHistory(data);
-          
-          // Mostrar botões de relatório após scan bem-sucedido
-          showActionButtons();
+          pollJobUntilDone(job_id, scanBtn, "▶ Iniciar Scan");
         })
         .catch(err => {
           console.error(err);
-          alert("Erro ao conectar com a API /scan/authenticated.");
-        })
-        .finally(() => {
+          alert("Erro ao conectar com a API /scan/start.");
           scanBtn.disabled = false;
           scanBtn.textContent = "▶ Iniciar Scan";
         });

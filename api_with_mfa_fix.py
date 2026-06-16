@@ -9,7 +9,10 @@ from pathlib import Path
 from secrets import token_urlsafe
 from typing import Any, Dict, Optional, Tuple
 
-from fastapi import Depends, FastAPI, HTTPException, Request, Response, Form
+import sqlite3
+import uuid
+import threading
+from fastapi import Depends, FastAPI, HTTPException, Request, Response, Form, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
@@ -86,6 +89,59 @@ app.add_middleware(SlowAPIMiddleware)
 
 LAST_SCAN_BY_EMAIL: Dict[str, Dict[str, Any]] = {}
 
+# -----------------------------------------------------------------------------
+# Jobs SQLite — persistência de scans assíncronos
+# -----------------------------------------------------------------------------
+JOBS_DB_PATH = BASE_DIR / "jobs.db"
+_jobs_lock = threading.Lock()
+
+
+def _init_jobs_db() -> None:
+    with sqlite3.connect(str(JOBS_DB_PATH)) as conn:
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS scan_jobs (
+                id TEXT PRIMARY KEY,
+                user_email TEXT NOT NULL,
+                status TEXT NOT NULL DEFAULT 'running',
+                result TEXT,
+                error TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        conn.commit()
+
+
+def _save_job(job_id: str, user_email: str, status: str,
+              result: Any = None, error: str = None) -> None:
+    import json as _json
+    with _jobs_lock, sqlite3.connect(str(JOBS_DB_PATH)) as conn:
+        conn.execute(
+            """INSERT OR REPLACE INTO scan_jobs (id, user_email, status, result, error)
+               VALUES (?, ?, ?, ?, ?)""",
+            (job_id, user_email, status,
+             _json.dumps(result) if result is not None else None, error)
+        )
+        conn.commit()
+
+
+def _get_job(job_id: str, user_email: str) -> Optional[Dict[str, Any]]:
+    import json as _json
+    with sqlite3.connect(str(JOBS_DB_PATH)) as conn:
+        row = conn.execute(
+            "SELECT status, result, error FROM scan_jobs WHERE id=? AND user_email=?",
+            (job_id, user_email)
+        ).fetchone()
+    if not row:
+        return None
+    return {
+        "status": row[0],
+        "result": _json.loads(row[1]) if row[1] else None,
+        "error": row[2],
+    }
+
+
+_init_jobs_db()
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
@@ -132,7 +188,7 @@ class MFAVerifyIn(BaseModel):
 
 class PublicScanIn(BaseModel):
     target: str = Field(..., description="Bucket/host alvo.")
-    max_objects: int = 1000
+    max_objects: int = 5000
 
 
 class AuthenticatedScanIn(BaseModel):
@@ -144,7 +200,7 @@ class AuthenticatedScanIn(BaseModel):
     region_name: Optional[str] = None
     region: Optional[str] = None
     service_account_key: Optional[Dict[str, Any]] = None
-    max_objects: int = 1000
+    max_objects: int = 5000
 
 
 class GenerateReportIn(BaseModel):
@@ -642,6 +698,83 @@ def scan_authenticated(payload: AuthenticatedScanIn, user=Depends(require_mfa)):
     if email:
         LAST_SCAN_BY_EMAIL[email] = result
     return result
+
+
+# -----------------------------------------------------------------------------
+# Scan assíncrono — background task + polling
+# -----------------------------------------------------------------------------
+
+def _run_scan_background(job_id: str, payload: AuthenticatedScanIn, user_email: str) -> None:
+    """Executa o scan em background e persiste o resultado no SQLite."""
+    try:
+        provider = (payload.provider or "AWS_S3").upper()
+        region_name = payload.region_name or payload.region
+
+        if provider == "GCS":
+            from auditor_gcs_authenticated import GCSAuthenticatedAuditor
+            auditor = GCSAuthenticatedAuditor(
+                bucket_name=payload.bucket,
+                service_account_key=payload.service_account_key,
+                max_objects=payload.max_objects,
+            )
+        else:
+            from auditor_s3_authenticated import S3AuthenticatedAuditor
+            auditor = S3AuthenticatedAuditor(
+                bucket_name=payload.bucket,
+                aws_access_key_id=payload.aws_access_key_id,
+                aws_secret_access_key=payload.aws_secret_access_key,
+                aws_session_token=payload.aws_session_token,
+                region_name=region_name,
+                max_objects=payload.max_objects,
+            )
+
+        result = auditor.run()
+        result = _normalize_scan_result(result, provider=provider, target=payload.bucket)
+        LAST_SCAN_BY_EMAIL[user_email] = result
+        _save_job(job_id, user_email, "done", result=result)
+    except Exception as exc:
+        _save_job(job_id, user_email, "error", error=str(exc))
+
+
+@app.post("/scan/start")
+def scan_start(payload: AuthenticatedScanIn, background_tasks: BackgroundTasks,
+               user=Depends(require_mfa)):
+    """Inicia scan em background e retorna job_id imediatamente."""
+    provider = (payload.provider or "AWS_S3").upper()
+    if provider == "GCS" and not payload.service_account_key:
+        raise HTTPException(status_code=400, detail="Credencial GCS ausente.")
+    if provider == "AWS_S3" and (not payload.aws_access_key_id or not payload.aws_secret_access_key):
+        raise HTTPException(status_code=400, detail="Credenciais AWS ausentes.")
+
+    job_id = str(uuid.uuid4())
+    user_email = user.get("email") if isinstance(user, dict) else str(user)
+    _save_job(job_id, user_email, "running")
+    background_tasks.add_task(_run_scan_background, job_id, payload, user_email)
+    return {"job_id": job_id, "status": "running"}
+
+
+@app.get("/scan/status/{job_id}")
+def scan_status(job_id: str, user=Depends(require_mfa)):
+    """Retorna o status atual de um job de scan."""
+    user_email = user.get("email") if isinstance(user, dict) else str(user)
+    job = _get_job(job_id, user_email)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job não encontrado.")
+    return {"job_id": job_id, "status": job["status"], "error": job.get("error")}
+
+
+@app.get("/scan/result/{job_id}")
+def scan_result(job_id: str, user=Depends(require_mfa)):
+    """Retorna o resultado completo de um scan concluído."""
+    user_email = user.get("email") if isinstance(user, dict) else str(user)
+    job = _get_job(job_id, user_email)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job não encontrado.")
+    if job["status"] == "running":
+        raise HTTPException(status_code=202, detail="Scan ainda em execução.")
+    if job["status"] == "error":
+        raise HTTPException(status_code=500, detail=job.get("error", "Erro desconhecido."))
+    return job["result"]
 
 
 @app.post("/generate-report")
