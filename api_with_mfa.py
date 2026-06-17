@@ -4,6 +4,8 @@ import logging
 import os
 import re
 import smtplib
+import time
+from collections import defaultdict
 
 from dotenv import load_dotenv
 
@@ -15,6 +17,7 @@ from secrets import token_urlsafe
 from typing import Any, Dict, Optional, Tuple
 
 from fastapi import Depends, FastAPI, HTTPException, Request, Response, Form
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
@@ -105,6 +108,28 @@ app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 app.add_middleware(SlowAPIMiddleware)
 
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    errors = exc.errors()
+    print(f"❌ 422 em {request.method} {request.url.path}: {errors}")
+    return JSONResponse(status_code=422, content={"detail": errors})
+
+# Rate limiting manual para /auth/login — @limiter.limit encadeados corrompem
+# a inspeção de assinatura do FastAPI e causam 422 "Field required"
+_login_ts_minute: Dict[str, list] = defaultdict(list)
+_login_ts_hour: Dict[str, list] = defaultdict(list)
+
+def _check_login_rate(ip: str) -> None:
+    now = time.time()
+    _login_ts_minute[ip] = [t for t in _login_ts_minute[ip] if now - t < 60]
+    _login_ts_hour[ip]   = [t for t in _login_ts_hour[ip]   if now - t < 3600]
+    if len(_login_ts_minute[ip]) >= 3:
+        raise HTTPException(status_code=429, detail="Muitas tentativas. Aguarde 1 minuto.")
+    if len(_login_ts_hour[ip]) >= 10:
+        raise HTTPException(status_code=429, detail="Limite por hora atingido.")
+    _login_ts_minute[ip].append(now)
+    _login_ts_hour[ip].append(now)
+
 LAST_SCAN_BY_EMAIL: Dict[str, Dict[str, Any]] = {}
 
 app.add_middleware(
@@ -153,7 +178,7 @@ class MFAVerifyIn(BaseModel):
 
 class PublicScanIn(BaseModel):
     target: str = Field(..., description="Bucket/host alvo.")
-    max_objects: int = 1000
+    max_objects: int = 5000
 
 
 class AuthenticatedScanIn(BaseModel):
@@ -165,7 +190,7 @@ class AuthenticatedScanIn(BaseModel):
     region_name: Optional[str] = None
     region: Optional[str] = None
     service_account_key: Optional[Dict[str, Any]] = None
-    max_objects: int = 1000
+    max_objects: int = 5000
 
 
 class GenerateReportIn(BaseModel):
@@ -507,8 +532,8 @@ def auth_register(data: UserRegisterIn):
 
 
 @app.post("/auth/login")
-@limiter.limit("1/minute")
 def auth_login(request: Request, data: UserLoginIn, response: Response):
+    _check_login_rate(get_client_ip(request))
     return login_user(email=data.email, password=data.password, mfa_code=data.mfa_code, response=response)
 
 

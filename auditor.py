@@ -4,7 +4,7 @@ from __future__ import annotations
 import requests
 import xml.etree.ElementTree as ET
 from typing import Any, Dict, List, Optional, Tuple
-from urllib.parse import urlparse
+from urllib.parse import urlparse, quote
 
 from engine_risk import classify_severity, build_severity_distribution, calculate_advanced_risk, build_recommendations
 
@@ -124,76 +124,82 @@ class S3Auditor:
         last_error = None
 
         for base in endpoints:
-            # Para path-style, não adiciona barra extra
-            if base.endswith(f"/{bucket}"):
-                url = f"{base}?list-type=2&max-keys={min(self.max_objects, 1000)}"
-            else:
-                url = f"{base}/?list-type=2&max-keys={min(self.max_objects, 1000)}"
-            
+            separator = "" if base.endswith(f"/{bucket}") else "/"
+            base_url = f"{base}{separator}?list-type=2&max-keys=1000"
+
             try:
-                r = self.session.get(url, timeout=self.timeout, verify=True)
-                
-                # 200 -> listado
-                if r.status_code == 200 and r.text.strip().startswith("<"):
+                continuation_token = None
+                page = 0
+
+                while len(files) < self.max_objects:
+                    url = base_url
+                    if continuation_token:
+                        url += f"&continuation-token={quote(continuation_token, safe='')}"
+
+                    r = self.session.get(url, timeout=self.timeout, verify=True)
+
+                    # 403 -> existe mas não lista publicamente
+                    if r.status_code in (403, 401):
+                        return False, [], None
+
+                    # 404 -> bucket pode não existir neste endpoint
+                    if r.status_code == 404:
+                        last_error = f"Bucket não encontrado (404) no endpoint {base}"
+                        break
+
+                    # 301/302 redirecionamentos com region header
+                    if r.status_code in (301, 302, 307, 308):
+                        reg = r.headers.get("x-amz-bucket-region")
+                        if reg and reg != region:
+                            return self._list_objects(bucket, reg)
+                        break
+
+                    if r.status_code != 200 or not r.text.strip().startswith("<"):
+                        last_error = f"Resposta inesperada: HTTP {r.status_code} no endpoint {base}"
+                        break
+
                     try:
                         root = ET.fromstring(r.text)
                         ns = ""
-                        # detecta namespace
                         if root.tag.startswith("{"):
                             ns = root.tag.split("}")[0] + "}"
 
                         for c in root.findall(f".//{ns}Contents"):
+                            if len(files) >= self.max_objects:
+                                break
                             key_el = c.find(f"{ns}Key")
                             size_el = c.find(f"{ns}Size")
                             if key_el is None:
                                 continue
                             key = (key_el.text or "").strip()
                             size = int(size_el.text) if (size_el is not None and (size_el.text or "").isdigit()) else 0
-
                             sev, reason = classify_severity(key)
-                            
-                            # Constrói URL pública do objeto
-                            if base.endswith(f"/{bucket}"):
-                                # Path-style
-                                object_url = f"{base}/{key}"
-                            else:
-                                # Virtual-hosted
-                                object_url = f"{base}/{key}"
-                            
-                            files.append({
-                                "key": key,
-                                "size": size,
-                                "severity": sev,
-                                "reason": reason,
-                                "url": object_url
-                            })
+                            object_url = f"{base}/{key}"
+                            files.append({"key": key, "size": size, "severity": sev, "reason": reason, "url": object_url})
 
-                        return True, files, None
+                        # Verifica paginação
+                        is_truncated_el = root.find(f".//{ns}IsTruncated")
+                        is_truncated = is_truncated_el is not None and (is_truncated_el.text or "").lower() == "true"
+
+                        if not is_truncated:
+                            return True, files, None
+
+                        next_token_el = root.find(f".//{ns}NextContinuationToken")
+                        if next_token_el is None or not next_token_el.text:
+                            return True, files, None
+
+                        continuation_token = next_token_el.text
+                        page += 1
+
                     except Exception as e:
-                        last_error = f"Falha ao parsear XML de listagem: {e}"
-                        continue
+                        last_error = f"Falha ao parsear XML de listagem (página {page}): {e}"
+                        break
 
-                # 403 -> existe mas não lista publicamente
-                if r.status_code in (403, 401):
-                    return False, [], None
+                if files:
+                    return True, files, None
 
-                # 404 -> bucket pode não existir
-                if r.status_code == 404:
-                    last_error = f"Bucket não encontrado (404) no endpoint {base}"
-                    continue
-
-                # 301/302 redirecionamentos
-                if r.status_code in (301, 302, 307, 308):
-                    # pode vir x-amz-bucket-region
-                    reg = r.headers.get("x-amz-bucket-region")
-                    if reg and reg != region:
-                        # tenta novamente com region correto
-                        return self._list_objects(bucket, reg)
-
-                last_error = f"Resposta inesperada ao listar objetos: HTTP {r.status_code} no endpoint {base}"
             except Exception as e:
                 last_error = f"Erro ao consultar endpoint {base}: {str(e)[:100]}"
-                # Continua tentando outros endpoints
 
         return False, [], last_error
 

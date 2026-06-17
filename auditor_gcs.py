@@ -68,7 +68,7 @@ class GCSAuditor:
         ]
 
         for base in bases:
-            url = f"{base}/?max-keys={min(self.max_objects, 1000)}"
+            url = f"{base}/?max-keys={min(self.max_objects, 5000)}"
             try:
                 r = self.session.get(url, timeout=self.timeout)
                 if r.status_code == 200 and r.text.strip().startswith("<"):
