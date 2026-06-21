@@ -1,31 +1,25 @@
-# 🛡️ Security Multicloud Scanner — Enterprise Edition
+# Security Multicloud Scanner — Enterprise Edition
 
-Advanced security auditing platform for **AWS S3**, **Google Cloud Storage**, **Azure Blob Storage** and **Kubernetes** with MFA enterprise authentication, interactive web dashboard and executive report generation.
-
----
-
-## 🚀 Features
-
-- ☁️ **Multicloud:** AWS S3, GCS, Azure Blob Storage
-- ☸️ **Kubernetes:** Authenticated cluster scanning (EKS, GKE, AKS, on-prem)
-- 🔐 **Dual Mode:** Public scan (no credentials) + authenticated (with credentials)
-- 🔑 **MFA Authentication:** Login with OTP via TOTP (Google Authenticator)
-- 📊 **Risk Scoring:** 0–100 with CRITICAL / HIGH / MEDIUM / LOW levels
-- ⚖️ **Compliance:** CIS, PCI-DSS, HIPAA, NIST, ISO 27001
-- 📄 **Executive Reports:** Automatic PDF and DOCX generation
-- 🎨 **Web Dashboard:** Modern interface with scan history and Chart.js graphs
-- 🛡️ **Rate Limiting:** Brute-force protection via slowapi
-- 📧 **Password Recovery:** Email reset with 30-minute token via SMTP/SES
+A production-grade **Cloud Security Posture Management (CSPM)** and **Cloud Workload Protection Platform (CWPP)** deployed on AWS with high availability. Performs deep security audits across object storage, IAM configurations, and Kubernetes clusters for AWS, Google Cloud, and Azure — with MFA-gated access, an interactive enterprise dashboard, password recovery via email, and automated executive report generation in PDF and DOCX.
 
 ---
 
-## 🏗️ Architecture
+## Features
 
-### Application
+- **IAM / CSPM scanning** — checks identity and access configuration against CIS Benchmarks for AWS, GCP, and Azure (Entra ID)
+- **Storage scanning** — audits AWS S3, Google Cloud Storage, and Azure Blob Storage for public exposure, dangerous ACLs, unencrypted objects, and misconfigurations
+- **Kubernetes scanning** — audits cluster RBAC, pod security, network policies, and workload configurations
+- **Risk scoring** — 0–100 composite score with CRITICAL / HIGH / MEDIUM / LOW severity breakdown
+- **Compliance mapping** — CIS Benchmarks, NIST SP 800-53, ISO 27001, PCI-DSS, HIPAA, AWS Well-Architected, Google Security Foundations, Microsoft Cloud Security Benchmark
+- **Executive reports** — PDF and DOCX with narrative, gauges, charts, top-10 findings, and provider-specific recommendations
+- **Interactive dashboard** — vulnerability heatmap, risk funnel, top findings, prioritized recommendations, sortable scan history
+- **MFA authentication** — TOTP via Google Authenticator with QR code setup
+- **Password recovery** — email reset flow with 30-minute signed token via SMTP / SES
+- **Rate limiting** — per-IP brute-force protection on login and password reset endpoints
 
-![Application Architecture — Security Multicloud Scanner](docs/app-architecture.png)
+---
 
-### AWS Infrastructure
+## AWS Infrastructure
 
 ![AWS Infrastructure — Security Multicloud Scanner (HA)](docs/aws-architecture.png)
 
@@ -35,135 +29,267 @@ Advanced security auditing platform for **AWS S3**, **Google Cloud Storage**, **
 
 ![Current vs Future Architecture](docs/architecture-current-vs-future.png)
 
-> **Current:** EC2 ASG + WAF v2 + ALB + NAT Gateways · **Future:** ECS Fargate + CloudFront + DynamoDB + S3 + Secrets Manager
+> **Current:** EC2 ASG + WAF v2 + ALB + NAT Gateways  
+> **Future:** ECS Fargate + CloudFront + DynamoDB + S3 + Secrets Manager
 
 ---
 
-## 📦 Installation
+## Supported Providers & Scan Types
 
-```bash
-# Clone the repository
-git clone https://github.com/charles-rocha-code/s3_auditor_enteprise.git
-cd s3_auditor_enteprise
-
-# Create virtual environment
-python3 -m venv venv
-source venv/bin/activate  # Linux/Mac
-# venv\Scripts\activate   # Windows
-
-# Install dependencies
-pip install -r requirements.txt
-```
+| Provider | Storage Scan | IAM / CSPM Scan |
+|---|---|---|
+| **AWS** | S3 — public + authenticated (up to 5 000 objects) | IAM — CIS AWS Foundations Benchmark v1.4 |
+| **Google Cloud** | GCS — public + authenticated | GCP IAM — CIS GCP Foundations Benchmark v2.0 |
+| **Azure** | Blob Storage — public + authenticated | Azure IAM / Entra ID — CIS Azure Foundations Benchmark v2.0 |
+| **Kubernetes** | — | RBAC, pod security, network policies, secrets hygiene |
 
 ---
 
-## 🔧 Starting the Server
+## IAM / CSPM Checks
 
-The main server is `api_with_mfa.py`, which includes MFA authentication.
+### AWS IAM — CIS AWS Foundations Benchmark v1.4
 
-```bash
-# Activate virtual environment
-source venv/bin/activate
+| Check | Severity | CIS Control |
+|---|---|---|
+| Root account MFA disabled | CRITICAL | 1.3 |
+| Root account with active access keys | CRITICAL | 1.3 |
+| Password policy: min length < 14 | MEDIUM | 1.8 |
+| Password policy: no expiration (> 90 days) | MEDIUM | 1.11 |
+| Password policy: no reuse prevention (< 24) | LOW | 1.10 |
+| Console user without MFA | HIGH | 1.10 |
+| Access key not rotated in > 90 days | HIGH | 1.14 |
+| User with direct AdministratorAccess | MEDIUM | 1.16 |
+| Inline policy attached directly to user | LOW | 1.16 |
 
-# Start server with MFA
-uvicorn api_with_mfa:app --host 0.0.0.0 --port 8000 --reload
+### GCP IAM — CIS GCP Foundations Benchmark v2.0
 
-# Access dashboard
-# http://localhost:8000/dashboard
-```
+| Check | Severity |
+|---|---|
+| Public IAM binding (`allUsers` / `allAuthenticatedUsers`) on project | CRITICAL |
+| Primitive role (`roles/owner`, `roles/editor`) on service account | HIGH |
+| High-risk role (`serviceAccountAdmin`, `organizationAdmin`, etc.) | HIGH |
+| Excess project owners (> 2) | MEDIUM |
+| SA key not rotated in > 90 days | HIGH |
+| SA with more than 1 active user-managed key | MEDIUM |
+| Default compute SA with `roles/editor` | HIGH |
 
-> ⚠️ `api.py` is the base server without MFA — use it only for local development. Always use `api_with_mfa.py` in production.
+### Azure IAM / Entra ID — CIS Azure Foundations Benchmark v2.0
+
+| Check | Severity | CIS Control |
+|---|---|---|
+| No Conditional Access Policy enforcing MFA for all users | CRITICAL | 1.1 |
+| Excess Global Administrators (> 4) | HIGH | 1.2 |
+| Guest user with Global Admin or Privileged Role Admin role | CRITICAL | 1.3 |
+| Subscription owners count > 3 | MEDIUM | 1.23 |
+| Custom role with wildcard actions (`*`, `/*`, `Microsoft.Authorization/*`) | HIGH | 1.24 |
+| Active Classic Administrator (Co-Admin — deprecated since 2023) | HIGH | — |
+| Role assignment scoped to root or management group | HIGH | — |
+| Expired Service Principal credential (client secret / certificate) | HIGH | — |
+| Service Principal credential expiring in ≤ 30 days | MEDIUM | — |
 
 ---
 
-## 👤 User Management
+## Dashboard
 
-### Reset user database
+### Scan Interface
+- Provider selector: AWS S3, GCS, Azure Blob, Kubernetes, AWS IAM, GCP IAM, Azure IAM / Entra ID
+- Public scan mode (no credentials, URL-based auto-detection)
+- Private scan mode with per-provider credential fields
+- Dedicated scan buttons per IAM provider — no shared-button conflicts
 
-```bash
-./reset_users.sh
-```
+### Visualizations
+- **KPI cards** — total findings, exposure status, composite risk score, C/H/M/L breakdown with count-up animations and semantic color accents
+- **Severity distribution chart** — animated doughnut
+- **Vulnerability heatmap** — findings across severity × category grid with rich tooltips (shows object/entity names)
+- **Risk Overview** — card-based layout (Prisma Cloud style) with sparkline animations
+- **Prioritized findings funnel** — narrows from total → CRITICAL, sorted by risk score
+- **Top findings by category** — animated horizontal bar chart
+- **Security recommendations** — priority-labeled cards (Urgent / Critical / High / Info) derived from scan data
+- **Scan history** — paginated table with sortable columns, severity pills, copy-path button, toast notifications, per-entry severity bar
 
-Stops the API, backs up the current database, resets users and restarts the server.
-
-### First access
-
-1. Go to `http://localhost:8000/dashboard`
-2. Click **Register** and enter your name, email and password
-3. Set up MFA via QR Code (Google Authenticator or similar)
-4. On next login, enter email, password and the 6-digit OTP code
+### Export
+- CSV export of all findings
+- Executive report trigger (PDF + DOCX) with dynamic severity pill counts
 
 ---
 
-## 📊 API Endpoints
+## Executive Reports
 
-### Health & Status
+Reports are generated by `generate_report.py` (ReportLab + python-docx + Matplotlib):
+
+- **Cover page** — provider name, scan target, date, global risk gauge
+- **Section 1 — Executive Summary** — provider-specific narrative, risk level, KPI metrics table
+- **Section 2 — Risk Overview** — severity distribution chart, findings funnel, top-findings-by-category bar chart, full findings table with remediation
+- **Section 3 — Compliance** — per-provider control mapping:
+  - AWS IAM → CIS AWS v1.4, ISO 27001, NIST SP 800-53, AWS Well-Architected
+  - GCP IAM → CIS GCP v2.0, ISO 27001, NIST, Google Security Foundations
+  - Azure IAM → CIS Azure v2.0, ISO 27001, NIST IA-2/IA-5, Microsoft Cloud Security Benchmark
+  - Storage / K8s → CIS, PCI-DSS, HIPAA, NIST
+- **Section 4 — Recommendations** — prioritized actions with timelines (immediate / 30-day / 90-day)
+- **Charts** — global risk gauge, up to 9 per-category gauges, category bar chart with external total labels
+
+---
+
+## API Reference
+
+### Health
 
 | Method | Endpoint | Description |
-|--------|----------|-------------|
-| `GET` | `/health` | Health check — `{"status": "ok"}` |
+|---|---|---|
+| `GET` | `/health` | Health check — `{"status":"ok"}` |
 
 ### Authentication
 
 | Method | Endpoint | Description | Auth |
-|--------|----------|-------------|------|
+|---|---|---|---|
 | `POST` | `/auth/register` | Register new user | Public |
 | `POST` | `/auth/login` | Login + MFA code | Public |
-| `POST` | `/auth/logout` | Logout (invalidates session) | Token |
-| `POST` | `/auth/mfa/setup` | Generate new MFA QR Code | Token |
-| `POST` | `/auth/mfa/verify` | Activate MFA with TOTP code | Token |
-| `GET` | `/auth/mfa/status` | Check user MFA status | Token |
-| `POST` | `/forgot-password` | Request password reset by email | Public |
+| `POST` | `/auth/logout` | Invalidate session | Token |
+| `POST` | `/auth/mfa/setup` | Generate TOTP secret + QR code | Token |
+| `POST` | `/auth/mfa/verify` | Activate MFA with OTP | Token |
+| `GET` | `/auth/mfa/status` | Check MFA enrollment | Token |
+| `POST` | `/forgot-password` | Send password reset email | Public |
 | `POST` | `/reset-password` | Reset password with token | Public |
 
-### Scanning
+### Storage Scans
 
 | Method | Endpoint | Description | Auth |
-|--------|----------|-------------|------|
-| `GET` | `/scan/{target}` | Public scan by name or URL (up to 200 objects) | MFA |
-| `POST` | `/scan/authenticated` | Authenticated scan S3/GCS/Azure/K8s (up to 1000 objects) | MFA |
-| `POST` | `/scan/k8s` | Kubernetes scan with kubeconfig | MFA |
+|---|---|---|---|
+| `GET` | `/scan/{target}` | Public scan — auto-detect provider from URL | MFA |
+| `POST` | `/scan/public` | Public scan with explicit provider | MFA |
+| `POST` | `/scan/authenticated` | Authenticated scan (S3 / GCS / Azure Blob) | MFA |
 
-### Reports
-
-| Method | Endpoint | Description | Auth |
-|--------|----------|-------------|------|
-| `POST` | `/generate-report` | Generate PDF + DOCX with charts | MFA |
-| `GET` | `/download-report/{filename}` | Download generated report | MFA |
-
-### Dashboard
+### IAM / CSPM Scans
 
 | Method | Endpoint | Description | Auth |
-|--------|----------|-------------|------|
-| `GET` | `/dashboard` | Web dashboard with history | MFA |
+|---|---|---|---|
+| `POST` | `/scan/iam` | AWS IAM audit | MFA |
+| `POST` | `/scan/iam/gcp` | GCP IAM audit | MFA |
+| `POST` | `/scan/iam/azure` | Azure IAM / Entra ID audit | MFA |
+
+### Kubernetes
+
+| Method | Endpoint | Description | Auth |
+|---|---|---|---|
+| `POST` | `/scan/k8s` | Kubernetes cluster audit (kubeconfig) | MFA |
+
+### Reports & Dashboard
+
+| Method | Endpoint | Description | Auth |
+|---|---|---|---|
+| `GET` | `/dashboard` | Interactive web dashboard | MFA |
 | `GET` | `/api/dashboard` | Current user data (JSON) | MFA |
+| `POST` | `/generate-report` | Generate PDF + DOCX executive report | MFA |
+| `GET` | `/download-report/{filename}` | Download generated report | MFA |
 
 ---
 
-## 🔐 Authenticated Scan — Examples
+## Installation
 
-### AWS S3
+```bash
+git clone https://github.com/charles-rocha-code/s3_auditor_enteprise.git
+cd s3_auditor_enteprise
+
+python3 -m venv venv
+source venv/bin/activate  # Windows: venv\Scripts\activate
+
+pip install -r requirements.txt
+```
+
+Copy `.env.example` to `.env` and configure:
+
+```env
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USER=your@email.com
+SMTP_PASS=xxxx xxxx xxxx xxxx
+APP_BASE_URL=https://scanner.yourdomain.com
+```
+
+Start the server:
+
+```bash
+uvicorn api_with_mfa:app --host 0.0.0.0 --port 8000
+```
+
+---
+
+## Usage Examples
+
+### AWS IAM Scan
+
+```bash
+curl -X POST http://localhost:8000/scan/iam \
+  -H "Authorization: Bearer <token>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "aws_access_key_id": "AKIA...",
+    "aws_secret_access_key": "...",
+    "region_name": "us-east-1"
+  }'
+```
+
+Requires `SecurityAudit` or `ReadOnlyAccess` IAM policy on the credentials.
+
+### GCP IAM Scan
+
+```bash
+curl -X POST http://localhost:8000/scan/iam/gcp \
+  -H "Authorization: Bearer <token>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "service_account_key": {
+      "type": "service_account",
+      "project_id": "my-project",
+      "private_key_id": "...",
+      "private_key": "-----BEGIN PRIVATE KEY-----\n...",
+      "client_email": "auditor@my-project.iam.gserviceaccount.com"
+    }
+  }'
+```
+
+Service account requires `roles/viewer` + `roles/iam.securityReviewer` on the project.
+
+### Azure IAM / Entra ID Scan
+
+```bash
+curl -X POST http://localhost:8000/scan/iam/azure \
+  -H "Authorization: Bearer <token>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "tenant_id": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+    "subscription_id": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+    "client_id": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+    "client_secret": "..."
+  }'
+```
+
+App Registration requires:
+- Azure RBAC: `Reader` on the subscription
+- Microsoft Graph (application, admin-consented): `Policy.Read.All`, `Directory.Read.All`, `RoleManagement.Read.All`
+
+### AWS S3 Authenticated Scan
 
 ```bash
 curl -X POST http://localhost:8000/scan/authenticated \
+  -H "Authorization: Bearer <token>" \
   -H "Content-Type: application/json" \
-  -H "Authorization: Bearer <your_token>" \
   -d '{
     "provider": "AWS_S3",
     "bucket": "my-bucket",
     "aws_access_key_id": "AKIA...",
-    "aws_secret_access_key": "xxxxx",
+    "aws_secret_access_key": "...",
     "region": "us-east-1",
-    "max_objects": 1000
+    "max_objects": 5000
   }'
 ```
 
-### Google Cloud Storage
+### GCS Authenticated Scan
 
 ```bash
 curl -X POST http://localhost:8000/scan/authenticated \
+  -H "Authorization: Bearer <token>" \
   -H "Content-Type: application/json" \
-  -H "Authorization: Bearer <your_token>" \
   -d '{
     "provider": "GCS",
     "bucket": "my-gcs-bucket",
@@ -177,14 +303,12 @@ curl -X POST http://localhost:8000/scan/authenticated \
   }'
 ```
 
-> The `service_account_key` JSON is generated at **GCP Console → IAM & Admin → Service Accounts → Create Key → JSON**.
-
-### Azure Blob Storage
+### Azure Blob Storage Scan
 
 ```bash
 curl -X POST http://localhost:8000/scan/authenticated \
+  -H "Authorization: Bearer <token>" \
   -H "Content-Type: application/json" \
-  -H "Authorization: Bearer <your_token>" \
   -d '{
     "provider": "AZURE_BLOB",
     "bucket": "myaccount.blob.core.windows.net",
@@ -193,227 +317,221 @@ curl -X POST http://localhost:8000/scan/authenticated \
   }'
 ```
 
-### Kubernetes
+### Kubernetes Scan
 
 ```bash
-curl -X POST http://localhost:8000/scan/authenticated \
+curl -X POST http://localhost:8000/scan/k8s \
+  -H "Authorization: Bearer <token>" \
   -H "Content-Type: application/json" \
-  -H "Authorization: Bearer <your_token>" \
   -d '{
-    "provider": "KUBERNETES",
-    "bucket": "my-cluster",
-    "kubeconfig_path": "/home/user/.kube/config",
+    "kubeconfig": "<base64-or-raw-yaml-kubeconfig>",
     "context": "my-context",
     "namespace": "production",
-    "max_objects": 1000
+    "max_resources": 1000
   }'
 ```
 
-> For EKS/GKE/AKS clusters, use the kubeconfig generated by the provider:
-> - `aws eks update-kubeconfig --name cluster --region us-east-1`
-> - `gcloud container clusters get-credentials CLUSTER --zone ZONE`
->
-> To run **inside the cluster**, omit `kubeconfig_path` and set `"in_cluster": true`.
+Generate kubeconfig for managed clusters:
+```bash
+aws eks update-kubeconfig --name my-cluster --region us-east-1   # EKS
+gcloud container clusters get-credentials my-cluster --zone us-central1-a  # GKE
+az aks get-credentials --resource-group my-rg --name my-cluster  # AKS
+```
 
----
-
-## 🌐 Public Scan (no credentials)
-
-Provider is auto-detected from the URL.
+### Generate Executive Report
 
 ```bash
-# AWS S3
-curl http://localhost:8000/scan/my-bucket
-
-# GCS (full URL)
-curl http://localhost:8000/scan/my-bucket.storage.googleapis.com
-
-# Azure
-curl http://localhost:8000/scan/myaccount.blob.core.windows.net
+curl -X POST http://localhost:8000/generate-report \
+  -H "Authorization: Bearer <token>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "format": "pdf",
+    "title": "Q2 2026 Cloud Security Audit",
+    "client_name": "Acme Corp"
+  }'
 ```
 
 ---
 
-## ☸️ Kubernetes — Security Checks
+## Kubernetes Security Checks
 
-The auditor `auditor_k8s_authenticated.py` connects to the cluster via kubeconfig and runs 5 check categories:
+The auditor `auditor_k8s_authenticated.py` runs 5 check categories:
 
-### 1. Workload Security (Pods and Containers)
-
-| Severity | Check |
-|---|---|
-| `CRITICAL` | Container with `privileged: true` |
-| `HIGH` | `hostNetwork: true` — shares node network |
-| `HIGH` | `hostPID: true` — accesses node processes |
-| `HIGH` | `hostIPC: true` |
-| `HIGH` | Container running as root (`runAsUser: 0` or missing `runAsNonRoot`) |
-| `MEDIUM` | Container missing `resources.limits` (CPU/memory) |
-
-### 2. RBAC
+### Workload Security
 
 | Severity | Check |
 |---|---|
-| `CRITICAL` | `ClusterRole` with `verbs: ["*"]` and `resources: ["*"]` (full permission) |
+| CRITICAL | Container with `privileged: true` |
+| HIGH | `hostNetwork: true` — shares node network namespace |
+| HIGH | `hostPID: true` — accesses node processes |
+| HIGH | `hostIPC: true` |
+| HIGH | Container running as root (`runAsUser: 0` or missing `runAsNonRoot`) |
+| MEDIUM | Container missing `resources.limits` (CPU / memory) |
 
-### 3. Secrets and ConfigMaps
-
-| Severity | Check |
-|---|---|
-| `CRITICAL` | `ConfigMap` with sensitive plaintext keys (`password`, `secret`, `token`, `apikey`, `private_key`) |
-| `MEDIUM` | `Secret` mounted as environment variable (can leak in logs) |
-
-### 4. Network Exposure
+### RBAC
 
 | Severity | Check |
 |---|---|
-| `MEDIUM` | `LoadBalancer` or `NodePort` service exposed externally |
-| `HIGH` | Namespace without `NetworkPolicy` (unrestricted pod-to-pod traffic) |
+| CRITICAL | `ClusterRole` with `verbs: ["*"]` and `resources: ["*"]` |
 
-### 5. Anonymous API Server Authentication
+### Secrets & ConfigMaps
 
 | Severity | Check |
 |---|---|
-| `CRITICAL` | `ClusterRoleBinding` to `system:anonymous` or `system:unauthenticated` |
+| CRITICAL | `ConfigMap` with plaintext sensitive keys (`password`, `secret`, `token`, `apikey`, `private_key`) |
+| MEDIUM | `Secret` mounted as environment variable (can leak in logs) |
 
-### Kubernetes Risk Score Formula
+### Network Exposure
 
-```
-risk_score = min(100, CRITICAL×25 + HIGH×10 + MEDIUM×3 + LOW×1)
-```
+| Severity | Check |
+|---|---|
+| MEDIUM | `LoadBalancer` or `NodePort` service exposed externally |
+| HIGH | Namespace with no `NetworkPolicy` (unrestricted pod-to-pod traffic) |
 
-### Response Payload
+### Anonymous Authentication
 
-```json
-{
-  "provider": "KUBERNETES",
-  "cluster": "1.29",
-  "platform": "linux/amd64",
-  "namespace_filter": "production",
-  "summary": { "namespaces_scanned": 5, "findings_total": 12 },
-  "files": [
-    {
-      "key": "default/Container/nginx/app",
-      "severity": "CRITICAL",
-      "category": "Workload Security",
-      "reason": "Container running as privileged",
-      "recommendation": "Remove privileged=true; use specific capabilities if needed."
-    }
-  ],
-  "severity_distribution": { "CRITICAL": 2, "HIGH": 4, "MEDIUM": 6, "LOW": 0 },
-  "risk_score": 72,
-  "recommendations": ["Remove privileged=true...", "Apply NetworkPolicy..."],
-  "errors": []
-}
-```
+| Severity | Check |
+|---|---|
+| CRITICAL | `ClusterRoleBinding` to `system:anonymous` or `system:unauthenticated` |
 
 ---
 
-## 🎯 Application Architecture — Modules
+## Architecture
 
 ```
-FastAPI Server (api_with_mfa.py)
+FastAPI (api_with_mfa.py)
 │
-├── MFA Authentication
-│   ├── auth_mfa.py                  — TOTP + JWT
-│   ├── templates/login.html         — Login page
-│   ├── templates/forgot_password.html
-│   └── templates/reset_password.html
+├── Auth Layer
+│   ├── auth_mfa.py                         — TOTP (pyotp) + JWT sessions
+│   ├── Rate limiting                        — slowapi, per-IP throttle
+│   ├── Password reset                       — SMTP / SES signed token flow
+│   └── templates/login.html                — Split-panel login UI
 │
-├── Public Scan (up to 200 objects)
-│   ├── auditor.py                   — AWS S3
-│   ├── auditor_gcs.py               — GCS
-│   └── auditor_azure.py             — Azure Blob
+├── Storage Auditors
+│   ├── auditor.py                           — AWS S3 (public)
+│   ├── auditor_s3_authenticated.py          — AWS S3 (authenticated, up to 5 000 objects)
+│   ├── auditor_gcs.py                       — Google Cloud Storage (public)
+│   ├── auditor_gcs_authenticated.py         — GCS (authenticated)
+│   ├── auditor_azure.py                     — Azure Blob Storage (public)
+│   └── auditor_azure_authenticated.py       — Azure Blob (authenticated)
 │
-├── Authenticated Scan (up to 1000 objects)
-│   ├── auditor_s3_authenticated.py
-│   ├── auditor_gcs_authenticated.py
-│   ├── auditor_azure_authenticated.py
-│   └── auditor_k8s_authenticated.py — ☸️ Kubernetes
+├── IAM / CSPM Auditors
+│   ├── auditor_iam.py                       — AWS IAM (CIS AWS v1.4)
+│   ├── auditor_iam_gcp.py                   — GCP IAM (CIS GCP v2.0)
+│   └── auditor_iam_azure.py                 — Azure IAM / Entra ID (CIS Azure v2.0)
 │
-├── Universal Router
-│   └── auditor_universal.py         — Auto-detects provider from URL
+├── Infrastructure Auditors
+│   └── auditor_k8s_authenticated.py         — Kubernetes RBAC + pod security
 │
 ├── Risk Engine
-│   └── engine_risk.py               — Scoring + Compliance
+│   └── engine_risk.py                       — Composite scoring + compliance mapping
 │
-├── Reports
-│   └── generate_report.py           — PDF + DOCX with charts
+├── Report Generator
+│   └── generate_report.py                   — PDF (ReportLab) + DOCX (python-docx) + charts (Matplotlib)
 │
 └── Dashboard
-    └── templates/dashboard.html
+    └── templates/dashboard.html             — Single-page app
 ```
 
 ---
 
-## 🗂️ File Structure
+## File Structure
 
 ```
 s3_auditor_enteprise/
-├── api_with_mfa.py                 # Main server (with MFA) ← use this
-├── api.py                          # Base server (without MFA)
-├── auth_mfa.py                     # MFA authentication module
-├── auditor_universal.py            # Provider router by URL
-├── auditor.py                      # AWS S3 public auditor
-├── auditor_gcs.py                  # GCS public auditor
-├── auditor_azure.py                # Azure public auditor
-├── auditor_s3_authenticated.py     # AWS S3 authenticated auditor
-├── auditor_gcs_authenticated.py    # GCS authenticated auditor
-├── auditor_azure_authenticated.py  # Azure authenticated auditor
-├── auditor_k8s_authenticated.py    # ☸️ Kubernetes authenticated auditor
-├── engine_risk.py                  # Risk and compliance engine
-├── generate_report.py              # PDF/DOCX report generator
-├── requirements.txt                # Python dependencies
-├── deploy_mfa.sh                   # Deploy with MFA
-├── reset_users.sh                  # Reset users
-├── install.sh                      # Installation script
+├── api_with_mfa.py                     # Main server — all endpoints, auth, orchestration
+├── auth_mfa.py                         # TOTP + JWT + password reset implementation
+│
+├── auditor.py                          # AWS S3 public auditor
+├── auditor_s3_authenticated.py         # AWS S3 authenticated auditor
+├── auditor_gcs.py                      # GCS public auditor
+├── auditor_gcs_authenticated.py        # GCS authenticated auditor
+├── auditor_azure.py                    # Azure Blob public auditor
+├── auditor_azure_authenticated.py      # Azure Blob authenticated auditor
+│
+├── auditor_iam.py                      # AWS IAM CSPM auditor (CIS AWS v1.4)
+├── auditor_iam_gcp.py                  # GCP IAM CSPM auditor (CIS GCP v2.0)
+├── auditor_iam_azure.py                # Azure IAM / Entra ID auditor (CIS Azure v2.0)
+│
+├── auditor_k8s_authenticated.py        # Kubernetes security auditor
+├── engine_risk.py                      # Risk scoring and compliance mapping
+├── generate_report.py                  # PDF + DOCX executive report generator
+│
+├── requirements.txt                    # Python dependencies
+├── deploy_mfa.sh                       # Production deploy script
+├── reset_users.sh                      # Reset user database
+│
 └── templates/
-    ├── dashboard.html              # Main dashboard
-    ├── login.html                  # MFA login page
-    ├── mfa_setup.html              # MFA setup
-    ├── forgot_password.html        # Password recovery
-    └── reset_password.html         # Password reset
+    ├── dashboard.html                  # Main SPA dashboard
+    ├── login.html                      # Split-panel login + MFA setup
+    ├── mfa_setup.html                  # TOTP QR code setup page
+    ├── forgot_password.html            # Password recovery form
+    └── reset_password.html             # Password reset form
 ```
 
 ---
 
-## ⚙️ Configuration
+## Configuration
 
 The system uses local JSON files for persistence:
 
 | File | Description |
-|------|-------------|
-| `users_db.json` | User database (do not commit to git) |
-| `sessions_db.json` | Active sessions (do not commit to git) |
-| `reports_executive/` | Generated reports (do not commit to git) |
+|---|---|
+| `users_db.json` | User store (gitignored) |
+| `sessions_db.json` | Active sessions (gitignored) |
+| `reports_executive/` | Generated reports (gitignored) |
 
-### Environment Variables (.env)
+### Environment Variables
 
 | Variable | Description | Example |
-|----------|-------------|---------|
-| `SMTP_HOST` | SMTP server for emails | `smtp.gmail.com` |
+|---|---|---|
+| `SMTP_HOST` | SMTP server | `smtp.gmail.com` |
 | `SMTP_PORT` | SMTP port | `587` |
-| `SMTP_USER` | Sender email | `your@email.com` |
+| `SMTP_USER` | Sender address | `you@email.com` |
 | `SMTP_PASS` | App password | `xxxx xxxx xxxx xxxx` |
-| `APP_BASE_URL` | Application base URL | `https://scanner.yourdomain.com` |
+| `APP_BASE_URL` | Public base URL | `https://scanner.yourdomain.com` |
 
 ---
 
-## 🔒 Security
+## Security Design
 
-- Credentials are **never stored** — used only during the scan in memory
-- JWT tokens with 24-hour expiration
-- MFA required for all authenticated scans
-- Rate limiting: 1 login/min, 3 forgot-password/hour
-- `.gitignore` configured to exclude sensitive data
-
----
-
-## 📝 License
-
-MIT License
+- **Credentials are never stored** — held in memory during the scan request only, discarded immediately after
+- **MFA required** for all scan, report, and dashboard endpoints
+- **JWT sessions** with 24-hour expiration
+- **Rate limiting** — 1 login/min, 3 password-reset requests/hour per IP (slowapi)
+- **Input validation** via Pydantic v2 on all POST endpoints
+- **Password reset tokens** are single-use and expire after 30 minutes
+- `.gitignore` excludes `users_db.json`, `sessions_db.json`, `reports_executive/`, `venv/`, `*.env`, `*.pem`
 
 ---
 
-## 👤 Author
+## Dependencies
 
-Developed by **Charles Rocha** for multicloud enterprise security auditing.
+```
+fastapi, uvicorn, starlette             — API server
+boto3                                   — AWS S3
+google-cloud-storage                    — GCS
+google-api-python-client                — GCP IAM APIs (Cloud Resource Manager + IAM)
+google-auth-httplib2                    — GCP auth transport
+azure-storage-blob                      — Azure Blob Storage
+azure-identity                          — Azure ClientSecretCredential
+azure-mgmt-authorization                — Azure RBAC (role assignments, definitions)
+kubernetes, pyyaml                      — Kubernetes audit
+pyotp, qrcode, Pillow                   — TOTP MFA + QR code generation
+python-dotenv                           — Environment config
+reportlab, python-docx                  — PDF and DOCX generation
+matplotlib, numpy                       — Charts and gauges in reports
+slowapi                                 — Rate limiting
+```
+
+---
+
+## License
+
+MIT License — see [LICENSE](LICENSE).
+
+---
+
+## Author
+
+Developed by **Charles Rocha** — enterprise cloud security tooling for multi-provider environments.
