@@ -765,6 +765,64 @@ def scan_k8s(data: K8sScanIn, user=Depends(require_mfa)):
             pass
 
 
+# ================= IAM SCANS (AWS / GCP / AZURE) =================
+
+class IamScanIn(BaseModel):
+    aws_access_key_id: str
+    aws_secret_access_key: str
+    aws_session_token: Optional[str] = None
+    region_name: str = "us-east-1"
+
+@app.post("/scan/iam")
+def scan_iam(payload: IamScanIn, user=Depends(require_mfa)):
+    from auditor_iam import AWSIAMAuditor
+    auditor = AWSIAMAuditor(
+        aws_access_key_id=payload.aws_access_key_id,
+        aws_secret_access_key=payload.aws_secret_access_key,
+        aws_session_token=payload.aws_session_token,
+        region_name=payload.region_name,
+    )
+    result = auditor.run()
+    email = user.get("email") if isinstance(user, dict) else None
+    if email:
+        LAST_SCAN_BY_EMAIL[email] = result
+    return result
+
+class GcpIamScanIn(BaseModel):
+    service_account_key: dict
+
+@app.post("/scan/iam/gcp")
+def scan_iam_gcp(payload: GcpIamScanIn, user=Depends(require_mfa)):
+    from auditor_iam_gcp import GCPIAMAuditor
+    auditor = GCPIAMAuditor(service_account_key=payload.service_account_key)
+    result = auditor.run()
+    email = user.get("email") if isinstance(user, dict) else None
+    if email:
+        LAST_SCAN_BY_EMAIL[email] = result
+    return result
+
+class AzureIamScanIn(BaseModel):
+    tenant_id: str
+    client_id: str
+    client_secret: str
+    subscription_id: str
+
+@app.post("/scan/iam/azure")
+def scan_iam_azure(payload: AzureIamScanIn, user=Depends(require_mfa)):
+    from auditor_iam_azure import AzureIAMAuditor
+    auditor = AzureIAMAuditor(
+        tenant_id=payload.tenant_id,
+        client_id=payload.client_id,
+        client_secret=payload.client_secret,
+        subscription_id=payload.subscription_id,
+    )
+    result = auditor.run()
+    email = user.get("email") if isinstance(user, dict) else None
+    if email:
+        LAST_SCAN_BY_EMAIL[email] = result
+    return result
+
+
 # ================= RESET PASSWORD =================
 
 class ResetPasswordIn(BaseModel):
