@@ -30,36 +30,30 @@ USERS_DB_FILE = "users_db.json"
 SESSIONS_DB_FILE = "sessions_db.json"
 
 # S3 sync — compartilha DB entre todas as instâncias do ASG
-# Defina DB_BUCKET no .env ou nas variáveis de ambiente da instância EC2
-DB_BUCKET     = os.getenv("DB_BUCKET", "")
-DB_S3_PREFIX  = os.getenv("DB_S3_PREFIX", "scanner-db/")
-AWS_REGION    = os.getenv("AWS_REGION", "us-east-2")
+# Produção (EC2/systemd): DB_S3_BUCKET definido pelo Terraform via user-data.sh
+# Local (.env):           DB_BUCKET=<nome-do-bucket>  (fallback)
+# Default hardcoded caso nenhuma env var esteja presente
+import boto3
+from botocore.exceptions import ClientError
 
-def _s3_client():
-    try:
-        import boto3
-        return boto3.client("s3", region_name=AWS_REGION)
-    except Exception:
-        return None
+S3_BUCKET = os.getenv("DB_BUCKET") or os.getenv("DB_S3_BUCKET", "security-scanner-db-442042548551")
+S3_PREFIX = "db/"  # mesmo prefixo do security-multicloud-scanner — compartilha o mesmo bucket
+
+def _s3_key(filename: str) -> str:
+    return S3_PREFIX + os.path.basename(filename)
 
 def load_db(filename: str) -> Dict:
     """Carrega DB — tenta S3 primeiro (compartilhado entre instâncias), depois disco local."""
-    if DB_BUCKET:
+    if S3_BUCKET:
         try:
-            s3 = _s3_client()
-            if s3:
-                key = f"{DB_S3_PREFIX}{filename}"
-                obj = s3.get_object(Bucket=DB_BUCKET, Key=key)
-                data = json.loads(obj["Body"].read().decode("utf-8"))
-                # Atualiza cache local
-                with open(filename, "w") as f:
-                    json.dump(data, f, indent=2)
-                print(f"✅ {filename} carregado do S3 ({len(data)} entradas)")
-                return data
+            s3 = boto3.client("s3", region_name=os.getenv("AWS_DEFAULT_REGION", "us-east-2"))
+            response = s3.get_object(Bucket=S3_BUCKET, Key=_s3_key(filename))
+            return json.loads(response["Body"].read().decode("utf-8"))
+        except ClientError as e:
+            if e.response["Error"]["Code"] != "NoSuchKey":
+                print(f"⚠️ S3 load error ({filename}): {e}")
         except Exception as e:
-            code = getattr(getattr(e, "response", {}), "get", lambda *a: None)("Error", {}).get("Code", "")
-            if code != "NoSuchKey":
-                print(f"⚠️  S3 load {filename}: {e} — usando disco local")
+            print(f"⚠️ S3 load error ({filename}): {e}")
 
     # Fallback: disco local
     if os.path.exists(filename):
@@ -71,31 +65,23 @@ def load_db(filename: str) -> Dict:
     return {}
 
 def save_db(filename: str, data: Dict) -> None:
-    """Salva DB no disco local E no S3 (para sincronizar todas as instâncias)."""
-    # Disco local sempre
+    """Salva DB no S3 (compartilhado) e no disco local (cache)."""
+    if S3_BUCKET:
+        try:
+            s3 = boto3.client("s3", region_name=os.getenv("AWS_DEFAULT_REGION", "us-east-2"))
+            s3.put_object(
+                Bucket=S3_BUCKET,
+                Key=_s3_key(filename),
+                Body=json.dumps(data, indent=2).encode("utf-8"),
+                ContentType="application/json",
+            )
+        except Exception as e:
+            print(f"⚠️ S3 save error ({filename}): {e}")
     with open(filename, "w") as f:
         json.dump(data, f, indent=2)
 
-    # S3 se configurado
-    if DB_BUCKET:
-        try:
-            s3 = _s3_client()
-            if s3:
-                key = f"{DB_S3_PREFIX}{filename}"
-                s3.put_object(
-                    Bucket=DB_BUCKET,
-                    Key=key,
-                    Body=json.dumps(data, indent=2).encode("utf-8"),
-                    ContentType="application/json",
-                )
-        except Exception as e:
-            print(f"⚠️  S3 save {filename}: {e} — dados salvos apenas localmente")
-
 def sync_from_s3() -> None:
-    """Força re-leitura do S3 para memória — chame no startup ou periodicamente."""
-    global USERS_DB, ACTIVE_SESSIONS
-    if not DB_BUCKET:
-        return
+    """Força re-leitura do S3 para memória — garante consistência no ASG."""
     fresh_users    = load_db(USERS_DB_FILE)
     fresh_sessions = load_db(SESSIONS_DB_FILE)
     USERS_DB.clear()
