@@ -48,6 +48,15 @@ try:
 except Exception as _e:
     K8S_AUDITOR_AVAILABLE = False
     print(f"⚠️ K8s auditor indisponível: {_e}")
+
+# === Histórico de scans + IA (Claude) ===
+from scan_history import save_scan, list_scans, load_recent  # type: ignore
+try:
+    import ai_analyzer  # type: ignore
+    AI_AVAILABLE = True
+except Exception as _ai_e:
+    AI_AVAILABLE = False
+    print(f"⚠️ ai_analyzer indisponível: {_ai_e}")
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.middleware import SlowAPIMiddleware
 from slowapi.errors import RateLimitExceeded
@@ -761,6 +770,10 @@ def scan_k8s(data: K8sScanIn, user=Depends(require_mfa)):
             max_resources=data.max_resources,
         )
         result = auditor.run()
+        email = user.get("email") if isinstance(user, dict) else None
+        if email:
+            LAST_SCAN_BY_EMAIL[email] = result
+            save_scan(email, "kubernetes", result)
         return result
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -795,6 +808,7 @@ def scan_iam(payload: IamScanIn, user=Depends(require_mfa)):
     email = user.get("email") if isinstance(user, dict) else None
     if email:
         LAST_SCAN_BY_EMAIL[email] = result
+        save_scan(email, "aws_iam", result)
     return result
 
 class GcpIamScanIn(BaseModel):
@@ -808,6 +822,7 @@ def scan_iam_gcp(payload: GcpIamScanIn, user=Depends(require_mfa)):
     email = user.get("email") if isinstance(user, dict) else None
     if email:
         LAST_SCAN_BY_EMAIL[email] = result
+        save_scan(email, "gcp_iam", result)
     return result
 
 class AzureIamScanIn(BaseModel):
@@ -829,7 +844,121 @@ def scan_iam_azure(payload: AzureIamScanIn, user=Depends(require_mfa)):
     email = user.get("email") if isinstance(user, dict) else None
     if email:
         LAST_SCAN_BY_EMAIL[email] = result
+        save_scan(email, "azure_iam", result)
     return result
+
+
+# ================= S3 / STORAGE SCAN (autenticado com MFA) =================
+
+class S3ScanIn(BaseModel):
+    bucket: str
+    aws_access_key_id: Optional[str] = None
+    aws_secret_access_key: Optional[str] = None
+    aws_session_token: Optional[str] = None
+    region_name: Optional[str] = "us-east-1"
+    max_objects: int = 5000
+
+@app.post("/scan/s3")
+def scan_s3(payload: S3ScanIn, user=Depends(require_mfa)):
+    """Scan autenticado de bucket S3 com persistência de histórico."""
+    auditor = S3AuthenticatedAuditor(
+        bucket_name=payload.bucket,
+        aws_access_key_id=payload.aws_access_key_id,
+        aws_secret_access_key=payload.aws_secret_access_key,
+        aws_session_token=payload.aws_session_token,
+        region_name=payload.region_name,
+        max_objects=payload.max_objects,
+    )
+    result = auditor.run()
+    email = user.get("email") if isinstance(user, dict) else None
+    if email:
+        LAST_SCAN_BY_EMAIL[email] = result
+        save_scan(email, "aws_s3", result)
+    return result
+
+
+# ================= HISTÓRICO DE SCANS =================
+
+@app.get("/scan/history")
+def scan_history(
+    provider: Optional[str] = None,
+    limit: int = 20,
+    user=Depends(require_mfa),
+):
+    """Lista os últimos scans do usuário logado. Filtre por provider opcional."""
+    email = user.get("email") if isinstance(user, dict) else None
+    if not email:
+        raise HTTPException(status_code=401, detail="Usuário não identificado.")
+    scans = list_scans(email, provider=provider, limit=limit)
+    return {"email": email, "total": len(scans), "scans": scans}
+
+
+# ================= IA — ANÁLISE COM CLAUDE =================
+
+class AiAskIn(BaseModel):
+    question: str
+    use_history: bool = True
+    provider: Optional[str] = None
+
+@app.post("/ai/analyze")
+def ai_analyze(user=Depends(require_mfa)):
+    """Análise executiva do último scan com Claude."""
+    if not AI_AVAILABLE:
+        raise HTTPException(status_code=503, detail="ai_analyzer indisponível.")
+    email = user.get("email") if isinstance(user, dict) else None
+    scan  = LAST_SCAN_BY_EMAIL.get(email) if email else None
+    if not scan:
+        raise HTTPException(status_code=404, detail="Nenhum scan encontrado. Realize um scan primeiro.")
+    try:
+        analysis = ai_analyzer.analyze(scan)
+        return {"analysis": analysis}
+    except RuntimeError as e:
+        raise HTTPException(status_code=503, detail=str(e))
+    except Exception as e:
+        logging.exception("Erro ai_analyze: %s", e)
+        raise HTTPException(status_code=500, detail=f"Erro na análise: {e}")
+
+
+@app.post("/ai/compare")
+def ai_compare(user=Depends(require_mfa), provider: Optional[str] = None):
+    """Compara o scan atual com o histórico e retorna análise de evolução."""
+    if not AI_AVAILABLE:
+        raise HTTPException(status_code=503, detail="ai_analyzer indisponível.")
+    email = user.get("email") if isinstance(user, dict) else None
+    scan  = LAST_SCAN_BY_EMAIL.get(email) if email else None
+    if not scan:
+        raise HTTPException(status_code=404, detail="Nenhum scan encontrado. Realize um scan primeiro.")
+    history = load_recent(email, provider=provider, n=3) if email else []
+    try:
+        comparison = ai_analyzer.compare(scan, history)
+        return {"comparison": comparison, "history_scans_used": len(history)}
+    except RuntimeError as e:
+        raise HTTPException(status_code=503, detail=str(e))
+    except Exception as e:
+        logging.exception("Erro ai_compare: %s", e)
+        raise HTTPException(status_code=500, detail=f"Erro na comparação: {e}")
+
+
+@app.post("/ai/ask")
+def ai_ask(body: AiAskIn, user=Depends(require_mfa)):
+    """Responde uma pergunta livre sobre o scan atual e/ou histórico."""
+    if not AI_AVAILABLE:
+        raise HTTPException(status_code=503, detail="ai_analyzer indisponível.")
+    email = user.get("email") if isinstance(user, dict) else None
+    scan  = LAST_SCAN_BY_EMAIL.get(email) if email else None
+    if not scan:
+        raise HTTPException(status_code=404, detail="Nenhum scan encontrado. Realize um scan primeiro.")
+    history = []
+    if body.use_history and email:
+        history = load_recent(email, provider=body.provider, n=3)
+    try:
+        answer = ai_analyzer.ask(body.question, scan, history)
+        return {"answer": answer, "history_scans_used": len(history)}
+    except RuntimeError as e:
+        raise HTTPException(status_code=503, detail=str(e))
+    except Exception as e:
+        logging.exception("Erro ai_ask: %s", e)
+        raise HTTPException(status_code=500, detail=f"Erro ao responder: {e}")
 
 
 # ================= RESET PASSWORD =================

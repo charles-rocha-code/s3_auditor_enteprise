@@ -33,6 +33,9 @@ numpy>=1.24.0
 # Rate limiting
 slowapi>=0.1.9
 
+# IA — Claude (Anthropic)
+anthropic>=0.25.0
+
 # Kubernetes
 kubernetes>=29.0.0
 pyyaml>=6.0.1
