@@ -674,9 +674,9 @@ class ProfessionalReportGenerator:
 
     PROVIDER_NAMES = {
         'AWS_S3':      'AWS S3',
-        'AWS_IAM':     'AWS IAM (CSPM)',
-        'GCP_IAM':     'GCP IAM (CSPM)',
-        'AZURE_IAM':   'Azure IAM / Entra ID (CSPM)',
+        'AWS_IAM':     'AWS IAM',
+        'GCP_IAM':     'GCP IAM',
+        'AZURE_IAM':   'Azure IAM / Entra ID',
         'GCS':         'Google Cloud Storage',
         'AZURE':       'Azure Blob Storage',
         'AZURE_BLOB':  'Azure Blob Storage',
@@ -771,11 +771,11 @@ class ProfessionalReportGenerator:
         sd    = self.scan_data.get('severity_distribution', {})
         score = self.scan_data.get('risk_score', 0)
         crit, high, med = sd.get('critical',0), sd.get('high',0), sd.get('medium',0)
-        if crit > 0:    lvl, col, act = 'CRÍTICO', self.COLOR_CRITICAL, 'AÇÃO IMEDIATA REQUERIDA'
-        elif high > 5:  lvl, col, act = 'ALTO',    self.COLOR_HIGH,     'AÇÃO URGENTE REQUERIDA'
+        if crit > 0:    lvl, col, act = 'CRÍTICO', self.COLOR_CRITICAL, 'AÇÃO IMEDIATA NECESSÁRIA — RISCO CRÍTICO IDENTIFICADO'
+        elif high > 5:  lvl, col, act = 'ALTO',    self.COLOR_HIGH,     'AÇÃO URGENTE NECESSÁRIA — MÚLTIPLOS RISCOS ALTOS'
         elif high > 0 or med > 10:
-                        lvl, col, act = 'MÉDIO',   self.COLOR_MEDIUM,   'AÇÃO NECESSÁRIA'
-        else:           lvl, col, act = 'BAIXO',   self.COLOR_LOW,      'MONITORAMENTO RECOMENDADO'
+                        lvl, col, act = 'MÉDIO',   self.COLOR_MEDIUM,   'AÇÃO CORRETIVA RECOMENDADA NOS PRÓXIMOS 7 DIAS'
+        else:           lvl, col, act = 'BAIXO',   self.COLOR_LOW,      'POSTURA ADEQUADA — MANTER MONITORAMENTO CONTÍNUO'
         return {'level':lvl,'score':score,'color':col,'action':act,
                 'critical_count':crit,'high_count':high,'medium_count':med}
 
@@ -1298,13 +1298,13 @@ class ProfessionalReportGenerator:
             keys_old     = summ.get('keys_old', 0)
             root_mfa     = summ.get('root_mfa', True)
             opening = (
-                f"Em {date_s}, foi realizado um scan CSPM de IAM na conta AWS <b>{bucket}</b>, "
+                f"Em {date_s}, foi conduzida uma auditoria CSPM de IAM na conta AWS <b>{bucket}</b>, "
                 f"analisando <b>{users_total} usuário(s)</b> e identificando <b>{total} finding(s)</b> de segurança. "
             )
             if crit > 0:
                 risk_sentence = (
                     f"Foram identificados <b>{crit} finding(s) CRÍTICO(s)</b> e <b>{high} de nível ALTO</b>, "
-                    f"indicando postura IAM de risco <b>{risk}</b> — ação imediata requerida. "
+                    f"indicando postura IAM de risco <b>{risk}</b> — ação imediata necessária. "
                 )
             elif high > 0:
                 risk_sentence = (
@@ -1325,9 +1325,9 @@ class ProfessionalReportGenerator:
                 f"O Risk Score IAM global é de <b>{score}/100</b>, "
                 f"calculado com base na severidade e volume de findings identificados. "
             )
-            action = ("Ação imediata recomendada para remediar os findings críticos." if crit > 0
-                      else "Priorizar as ações corretivas nos próximos 7 dias." if high > 0
-                      else "Manter monitoramento contínuo e revisões periódicas de IAM.")
+            action = ("Remediação imediata dos findings críticos é necessária para reduzir o risco de comprometimento da conta." if crit > 0
+                      else "As ações corretivas devem ser priorizadas nos próximos 7 dias para mitigar os riscos identificados." if high > 0
+                      else "Recomenda-se manter monitoramento contínuo e revisões periódicas da postura IAM.")
             return opening + risk_sentence + detail_sentence + score_sentence + action
 
         if provider_raw == 'GCP_IAM':
@@ -1336,7 +1336,7 @@ class ProfessionalReportGenerator:
             sa_keys_old = summ.get('sa_keys_old', 0)
             pub_bind    = summ.get('public_bindings', 0)
             opening = (
-                f"Em {date_s}, foi realizado um scan CSPM de IAM no projeto GCP <b>{project_id}</b>, "
+                f"Em {date_s}, foi conduzida uma auditoria CSPM de IAM no projeto GCP <b>{project_id}</b>, "
                 f"identificando <b>{total} finding(s)</b> de segurança em políticas IAM e Service Accounts. "
             )
             if crit > 0:
@@ -1360,9 +1360,9 @@ class ProfessionalReportGenerator:
                 f"Risk Score IAM GCP: <b>{score}/100</b>, "
                 f"calculado pela severidade dos findings identificados no projeto. "
             )
-            action = ("Ação imediata recomendada — remover bindings públicos e SA com roles/owner." if crit > 0
-                      else "Priorizar rotação de SA keys e remoção de primitive roles nos próximos 7 dias." if high > 0
-                      else "Manter monitoramento via Security Command Center e IAM Recommender.")
+            action = ("A remoção imediata de bindings públicos e Service Accounts com roles/owner é necessária para eliminar a exposição." if crit > 0
+                      else "A rotação de SA keys e remoção de primitive roles deve ser priorizada nos próximos 7 dias." if high > 0
+                      else "Recomenda-se manter monitoramento via Security Command Center e revisões periódicas com o IAM Recommender.")
             return opening + risk_sentence + detail_sentence + score_sentence + action
 
         if provider_raw == 'AZURE_IAM':
@@ -1371,7 +1371,7 @@ class ProfessionalReportGenerator:
             no_mfa    = summ.get('no_mfa_enforcement', False)
             guest_adm = summ.get('guest_admins', 0)
             opening = (
-                f"Em {date_s}, foi realizado um scan CSPM de IAM na subscription Azure <b>{sub_id}</b> "
+                f"Em {date_s}, foi conduzida uma auditoria CSPM de IAM na subscription Azure <b>{sub_id}</b> "
                 f"e tenant Entra ID, identificando <b>{total} finding(s)</b> de segurança. "
             )
             if crit > 0:
@@ -1397,9 +1397,9 @@ class ProfessionalReportGenerator:
                 f"Risk Score IAM Azure: <b>{score}/100</b>, "
                 f"calculado pela severidade dos findings na subscription e Entra ID. "
             )
-            action = ("Ação imediata — enforçar MFA via Conditional Access e remover Guest admins." if crit > 0
-                      else "Priorizar redução de Global Admins e renovação de credenciais SP nos próximos 7 dias." if high > 0
-                      else "Manter monitoramento via Microsoft Defender for Cloud e revisões periódicas.")
+            action = ("O enforcement de MFA via Conditional Access e a remoção de Guest admins privilegiados devem ser implementados imediatamente." if crit > 0
+                      else "A redução de Global Admins e renovação de credenciais de Service Principal devem ser priorizadas nos próximos 7 dias." if high > 0
+                      else "Recomenda-se manter monitoramento contínuo via Microsoft Defender for Cloud e revisões periódicas de postura.")
             return opening + risk_sentence + detail_sentence + score_sentence + action
 
         # Frase de abertura
@@ -1528,7 +1528,7 @@ class ProfessionalReportGenerator:
         canvas.setFillColor(colors.HexColor('#64748b'))
         canvas.setFont('Helvetica', 8)
         canvas.drawString(0.55*inch, 0.25*inch,
-                          f"Security Multicloud Scanner  |  {self.provider_name}")
+                          f"S3 Auditor Enterprise  |  {self.provider_name}")
         canvas.drawRightString(A4[0]-0.55*inch, 0.25*inch, f"Página {doc.page}")
         canvas.restoreState()
 
@@ -1559,10 +1559,17 @@ class ProfessionalReportGenerator:
         canvas.drawCentredString(w / 2, h * 0.64, 'EXECUTIVO')
 
         # Subtítulo
+        provider_raw = self.scan_data.get('provider', '').upper()
+        if 'IAM' in provider_raw:
+            scan_type = 'Auditoria de Postura IAM / CSPM'
+        elif 'KUBERNETES' in provider_raw:
+            scan_type = 'Auditoria de Segurança Kubernetes'
+        else:
+            scan_type = 'Auditoria de Storage Multicloud'
         canvas.setFillColor(colors.HexColor('#bfdbfe'))
         canvas.setFont('Helvetica', 12)
         canvas.drawCentredString(w / 2, h * 0.57,
-                                 f'Auditoria de Storage Multicloud  ·  {self.provider_name}')
+                                 f'{scan_type}  ·  {self.provider_name}')
 
         # Linha separadora
         canvas.setStrokeColor(colors.HexColor('#3b82f6'))
@@ -1611,7 +1618,7 @@ class ProfessionalReportGenerator:
         canvas.setFillColor(colors.HexColor('#94a3b8'))
         canvas.setFont('Helvetica', 8)
         canvas.drawCentredString(w / 2, 0.28*inch,
-                                 'Security Multicloud Scanner  ·  Documento Confidencial')
+                                 'S3 Auditor Enterprise  ·  Documento Confidencial')
         canvas.restoreState()
 
     def generate_pdf(self) -> str:
@@ -1654,6 +1661,8 @@ class ProfessionalReportGenerator:
         sd     = self.scan_data.get('severity_distribution', {})
         total  = len(self.scan_data.get('files', []))
         risk   = self.risk_level
+        is_iam = 'IAM' in self.scan_data.get('provider', '').upper()
+        iam_summ = self.scan_data.get('summary', {}) if is_iam else {}
 
         # ── CAPA — desenhada inteiramente via canvas (_create_cover_page) ──
         story.append(PageBreak())
@@ -1736,11 +1745,11 @@ class ProfessionalReportGenerator:
                 keys_old     = iam_summ.get('keys_old', 0)
                 admin_direct = iam_summ.get('admin_direct', 0)
                 iam_kpi_rows = [
-                    _iam_kpi('Root MFA',     'SIM' if root_mfa_ok else 'NÃO', root_mfa_ok),
-                    _iam_kpi('Root Keys',    'NÃO' if not root_keys else 'SIM', not root_keys),
-                    _iam_kpi('Sem MFA',      users_no_mfa, users_no_mfa == 0, ' users'),
-                    _iam_kpi('Keys Velhas',  keys_old,     keys_old == 0,    ' keys'),
-                    _iam_kpi('Admin Direto', admin_direct, admin_direct == 0, ' users'),
+                    _iam_kpi('Root MFA',       'SIM' if root_mfa_ok else 'NÃO', root_mfa_ok),
+                    _iam_kpi('Root Keys Ativas','NÃO' if not root_keys else 'SIM', not root_keys),
+                    _iam_kpi('Usuários s/ MFA', users_no_mfa, users_no_mfa == 0, ''),
+                    _iam_kpi('Keys +90 dias',   keys_old,     keys_old == 0,    ''),
+                    _iam_kpi('Admin Direto',     admin_direct, admin_direct == 0, ''),
                 ]
             elif iam_prov_kpi == 'GCP_IAM':
                 pub_bind    = iam_summ.get('public_bindings', 0)
@@ -1749,11 +1758,11 @@ class ProfessionalReportGenerator:
                 own_count   = len([f for f in self.scan_data.get('files', []) if 'owners' in f.get('check','').lower()])
                 hr_count    = len([f for f in self.scan_data.get('files', []) if 'alto risco' in f.get('check','').lower()])
                 iam_kpi_rows = [
-                    _iam_kpi('Bind. Públicos', pub_bind,    pub_bind == 0,    ''),
-                    _iam_kpi('Prim. Roles',    prm_count,   prm_count == 0,   ''),
-                    _iam_kpi('SA Keys Old',    sa_keys_old, sa_keys_old == 0, ''),
-                    _iam_kpi('Owners+',        own_count,   own_count == 0,   ''),
-                    _iam_kpi('High Risk',      hr_count,    hr_count == 0,    ''),
+                    _iam_kpi('Bindings Públicos', pub_bind,    pub_bind == 0,    ''),
+                    _iam_kpi('Primitive Roles',   prm_count,   prm_count == 0,   ''),
+                    _iam_kpi('SA Keys +90 dias',  sa_keys_old, sa_keys_old == 0, ''),
+                    _iam_kpi('Project Owners+',   own_count,   own_count == 0,   ''),
+                    _iam_kpi('Roles Alto Risco',  hr_count,    hr_count == 0,    ''),
                 ]
             elif iam_prov_kpi == 'AZURE_IAM':
                 no_mfa    = iam_summ.get('no_mfa_enforcement', False)
@@ -1762,11 +1771,11 @@ class ProfessionalReportGenerator:
                 owners    = len([f for f in self.scan_data.get('files', []) if 'Owner' in f.get('check','') and 'Guest' not in f.get('check','')])
                 wildcard  = len([f for f in self.scan_data.get('files', []) if 'wildcard' in f.get('check','').lower()])
                 iam_kpi_rows = [
-                    _iam_kpi('MFA Policy',    'NÃO' if no_mfa else 'SIM', not no_mfa),
-                    _iam_kpi('Guest Admins',  guest_adm, guest_adm == 0,  ''),
-                    _iam_kpi('SP Expirados',  sp_exp,    sp_exp == 0,     ''),
-                    _iam_kpi('Owners+',       owners,    owners == 0,     ''),
-                    _iam_kpi('Wildcard Roles',wildcard,  wildcard == 0,   ''),
+                    _iam_kpi('MFA Enforced',      'NÃO' if no_mfa else 'SIM', not no_mfa),
+                    _iam_kpi('Guest Admins',       guest_adm, guest_adm == 0,  ''),
+                    _iam_kpi('SPs Expirados',      sp_exp,    sp_exp == 0,     ''),
+                    _iam_kpi('Owners Excessivos',  owners,    owners == 0,     ''),
+                    _iam_kpi('Roles Wildcard',     wildcard,  wildcard == 0,   ''),
                 ]
             else:
                 iam_kpi_rows = []
@@ -1779,7 +1788,7 @@ class ProfessionalReportGenerator:
                     ('LINEAFTER',  (0,0), (3,-1), 0.5, colors.HexColor('#e2e8f0')),
                     ('LINEBEFORE', (0,0), (0,-1), 0.5, colors.HexColor('#e2e8f0')),
                     ('LINEAFTER',  (4,0), (4,-1), 0.5, colors.HexColor('#e2e8f0')),
-                    ('LINEABOVE',  (0,0), (-1,0), 3, colors.HexColor('#a855f7')),
+                    ('LINEABOVE',  (0,0), (-1,0), 3, self.COLOR_PRIMARY),
                     ('LINEBELOW',  (0,-1), (-1,-1), 0.5, colors.HexColor('#e2e8f0')),
                     ('PADDING',    (0,0), (-1,-1), 8),
                     ('VALIGN',     (0,0), (-1,-1), 'MIDDLE'),
@@ -1787,14 +1796,12 @@ class ProfessionalReportGenerator:
                 ]))
                 story.append(Paragraph("POSTURA IAM — INDICADORES CHAVE",
                                         ParagraphStyle('IAM_TTL', fontSize=11, fontName='Helvetica-Bold',
-                                                       textColor=colors.HexColor('#7c3aed'), spaceAfter=2)))
+                                                       textColor=self.COLOR_PRIMARY, spaceAfter=2)))
                 story.append(iam_kpi_tbl)
                 story.append(Spacer(1, 0.15*inch))
 
         # Métricas resumidas + ação
-        is_iam   = 'IAM' in self.scan_data.get('provider','').upper()
         iam_prov = self.scan_data.get('provider','').upper()
-        iam_summ = self.scan_data.get('summary', {}) if is_iam else {}
         target_label = 'Account / Project / Subscription' if is_iam else 'Bucket / Container'
         files_label  = 'Total de Findings' if is_iam else 'Total de Arquivos'
         if iam_prov == 'AWS_IAM':
@@ -1866,16 +1873,18 @@ class ProfessionalReportGenerator:
                 ('LEFTPADDING',  (1, 0), (1, 0), 14),
             ]))
             story.append(gauge_layout)
-            story.append(Paragraph("Figura 1 — Risco Global do Ambiente", NOTE))
+            gauge_caption = "Figura 1 — Risco Global da Postura IAM" if is_iam else "Figura 1 — Risco Global do Ambiente"
+            story.append(Paragraph(gauge_caption, NOTE))
         else:
             story.append(narr_para)
 
         story.append(Spacer(1, 0.14*inch))
 
-        # ── Top 10 arquivos mais críticos ─────────────────────────────
+        # ── Top 10 findings / arquivos mais críticos ──────────────────
         if self.top_critical_files:
-            story.append(Paragraph("Arquivos de Maior Risco", H2))
-            top_data = [['#', 'Arquivo', 'Severidade', 'Tamanho', 'Motivo']]
+            section_label = "Findings de Maior Risco" if is_iam else "Arquivos de Maior Risco"
+            story.append(Paragraph(section_label, H2))
+            top_data = [['#', 'Entidade' if is_iam else 'Arquivo', 'Severidade', 'Tamanho' if not is_iam else 'Score', 'Motivo']]
             for i, f in enumerate(self.top_critical_files[:10], 1):
                 fname = f['file']
                 fname_display = ('...' + fname[-42:]) if len(fname) > 45 else fname
@@ -1951,10 +1960,11 @@ class ProfessionalReportGenerator:
                 _max_tot = max(c[1]['total'] for c in _cat_list)
                 _SH = ParagraphStyle('_SH', fontSize=7, fontName='Helvetica-Bold',
                                      textColor=colors.HexColor('#64748b'), alignment=TA_CENTER)
+                _col_label = 'Findings' if is_iam else 'Arquivos'
                 _ta = [[Paragraph('<b>#</b>', _SH),
                         Paragraph('<b>Categoria</b>', _SH),
                         Paragraph('<b>Score</b>', _SH),
-                        Paragraph('<b>Arquivos</b>', _SH),
+                        Paragraph(f'<b>{_col_label}</b>', _SH),
                         Paragraph('', _SH)]]
                 for _i, (_cn, _g, _score) in enumerate(_cat_list, 1):
                     _sc = (self.COLOR_CRITICAL if _score >= 7 else
@@ -2243,7 +2253,7 @@ class ProfessionalReportGenerator:
             styles['Normal']))
         story.append(Spacer(1,0.5*inch))
         story.append(Paragraph(
-            f"<b>Security Multicloud Scanner</b><br/>{self.provider_name} | "
+            f"<b>S3 Auditor Enterprise</b><br/>{self.provider_name} | "
             "Relatório gerado automaticamente<br/>Este documento contém informações confidenciais",
             ParagraphStyle('SIG', fontSize=8, textColor=colors.grey, alignment=TA_CENTER)))
 
