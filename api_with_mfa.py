@@ -34,6 +34,7 @@ from auth_mfa import (  # type: ignore
     register_user,
     require_mfa,
     setup_mfa,
+    sync_from_s3,
     verify_and_activate_mfa,
 )
 
@@ -102,6 +103,14 @@ def get_client_ip(request: Request) -> str:
 
 
 app = FastAPI(title="Security Multicloud Storage Scanner (MFA)")
+
+@app.on_event("startup")
+async def startup_sync():
+    """Sincroniza users_db e sessions_db do S3 ao iniciar — garante consistência no ASG."""
+    try:
+        sync_from_s3()
+    except Exception as e:
+        print(f"⚠️  startup sync_from_s3: {e}")
 
 limiter = Limiter(key_func=get_client_ip)
 app.state.limiter = limiter

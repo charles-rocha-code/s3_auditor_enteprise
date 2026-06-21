@@ -29,21 +29,80 @@ import os
 USERS_DB_FILE = "users_db.json"
 SESSIONS_DB_FILE = "sessions_db.json"
 
-# Carregar dados existentes ou criar novos
+# S3 sync — compartilha DB entre todas as instâncias do ASG
+# Defina DB_BUCKET no .env ou nas variáveis de ambiente da instância EC2
+DB_BUCKET     = os.getenv("DB_BUCKET", "")
+DB_S3_PREFIX  = os.getenv("DB_S3_PREFIX", "scanner-db/")
+AWS_REGION    = os.getenv("AWS_REGION", "us-east-2")
+
+def _s3_client():
+    try:
+        import boto3
+        return boto3.client("s3", region_name=AWS_REGION)
+    except Exception:
+        return None
+
 def load_db(filename: str) -> Dict:
-    """Carrega banco de dados do arquivo JSON"""
+    """Carrega DB — tenta S3 primeiro (compartilhado entre instâncias), depois disco local."""
+    if DB_BUCKET:
+        try:
+            s3 = _s3_client()
+            if s3:
+                key = f"{DB_S3_PREFIX}{filename}"
+                obj = s3.get_object(Bucket=DB_BUCKET, Key=key)
+                data = json.loads(obj["Body"].read().decode("utf-8"))
+                # Atualiza cache local
+                with open(filename, "w") as f:
+                    json.dump(data, f, indent=2)
+                print(f"✅ {filename} carregado do S3 ({len(data)} entradas)")
+                return data
+        except Exception as e:
+            code = getattr(getattr(e, "response", {}), "get", lambda *a: None)("Error", {}).get("Code", "")
+            if code != "NoSuchKey":
+                print(f"⚠️  S3 load {filename}: {e} — usando disco local")
+
+    # Fallback: disco local
     if os.path.exists(filename):
         try:
-            with open(filename, 'r') as f:
+            with open(filename, "r") as f:
                 return json.load(f)
-        except:
+        except Exception:
             return {}
     return {}
 
-def save_db(filename: str, data: Dict):
-    """Salva banco de dados no arquivo JSON"""
-    with open(filename, 'w') as f:
+def save_db(filename: str, data: Dict) -> None:
+    """Salva DB no disco local E no S3 (para sincronizar todas as instâncias)."""
+    # Disco local sempre
+    with open(filename, "w") as f:
         json.dump(data, f, indent=2)
+
+    # S3 se configurado
+    if DB_BUCKET:
+        try:
+            s3 = _s3_client()
+            if s3:
+                key = f"{DB_S3_PREFIX}{filename}"
+                s3.put_object(
+                    Bucket=DB_BUCKET,
+                    Key=key,
+                    Body=json.dumps(data, indent=2).encode("utf-8"),
+                    ContentType="application/json",
+                )
+        except Exception as e:
+            print(f"⚠️  S3 save {filename}: {e} — dados salvos apenas localmente")
+
+def sync_from_s3() -> None:
+    """Força re-leitura do S3 para memória — chame no startup ou periodicamente."""
+    global USERS_DB, ACTIVE_SESSIONS
+    if not DB_BUCKET:
+        return
+    fresh_users    = load_db(USERS_DB_FILE)
+    fresh_sessions = load_db(SESSIONS_DB_FILE)
+    USERS_DB.clear()
+    USERS_DB.update(fresh_users)
+    ACTIVE_SESSIONS.clear()
+    ACTIVE_SESSIONS.update(fresh_sessions)
+    print(f"🔄 Sync S3: {len(USERS_DB)} usuário(s), {len(ACTIVE_SESSIONS)} sessão(ões)")
 
 # Carregar bancos de dados
 USERS_DB: Dict[str, Dict[str, Any]] = load_db(USERS_DB_FILE)
