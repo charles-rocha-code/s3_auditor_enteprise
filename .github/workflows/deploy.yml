@@ -1,9 +1,8 @@
 name: Deploy to AWS
 
+# Deploy desativado — repositório consolidado em security-multicloud-scanner
 on:
-  push:
-    branches:
-      - main
+  workflow_dispatch:
 
 concurrency:
   group: production-deploy
